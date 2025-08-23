@@ -1,0 +1,37 @@
+
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20rpx;
+  }
+  
+.history-page {
+    padding: 30rpx;
+    background-color: #FFFDF7;
+  }
+  
+.add-button {
+    font-size: 40rpx;
+    font-weight: bold;
+    color: #D8B4A0;
+    padding: 0 20rpx;
+  }
+
+  .section-title {
+    font-size: 36rpx;
+    font-weight: 700;
+    color: #A8D5BA;
+    margin-bottom: 20rpx;
+  }
+
+.star-icon {
+    position: absolute;
+    top: 16rpx;
+    right: 16rpx;
+    font-size: 32rpx;
+    color: #FFD700;
+    z-index: 10;
+  }
+  
+  

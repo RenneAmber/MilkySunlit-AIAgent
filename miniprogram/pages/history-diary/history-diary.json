@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "历史日记",
+  "navigationBarBackgroundColor": "#A8D5BA",
+  "navigationBarTextStyle": "white",
+  "enablePullDownRefresh": false,
+  "usingComponents": {}
+}

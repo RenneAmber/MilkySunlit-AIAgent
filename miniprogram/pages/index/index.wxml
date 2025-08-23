@@ -1,0 +1,29 @@
+<view class="page">
+  <view class="title">
+    奶菠小筑
+  </view>
+  <view class="sub-title">
+    属于小菠萝与牛奶小姐的阳光物语
+  </view>
+  <view class="btn-box">
+    <view class="btn-fill" bind:tap="goToHistoryDiary">奶菠日记</view>
+    <view class="btn-light" bind:tap="goChatBot">奶菠陪聊</view>
+  </view>
+
+  <view class="function-box">
+    <view class="function-box-title" bind:tap="expandModel" id="anchor1">
+      <text>重要日记</text>
+      <image src="../../imgs/arrow.png" mode="widthFix" style="width: 16px;height: 16px;transform-origin: center center;transform: rotate({{modelExpand?90:0}}deg);" />
+    </view>
+    <view wx:if="{{modelExpand}}">
+        <view wx:for="{{diaryList}}" wx:key="index" wx:if="{{item.important}}" class="diary-card">
+            <image src="{{item.image}}" wx:if="{{item.image}}" class="diary-image" mode="aspectFit" bindtap="previewImage" data-src="{{item.image}}" />
+            <view class="diary-text">{{item.text}}</view>
+            <view class="delete-icon" bindtap="deleteDiary" data-index="{{index}}">🗑️</view>
+            <view class="diary-meta">
+                <text>{{item.date}}</text>
+            </view>
+        </view>
+    </view>
+  </view>
+</view>

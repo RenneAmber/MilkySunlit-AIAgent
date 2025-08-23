@@ -1,0 +1,15 @@
+<view class="history-page"> 
+  <view class="header-row">
+    <view class="section-title">历史日记</view>
+    <view class="add-button" bindtap="goToAddDiary">＋</view>
+  </view>
+  <view wx:for="{{diaryList}}" wx:key="index" class="diary-card">
+    <image src="{{item.image}}" wx:if="{{item.image}}" class="diary-image" mode="aspectFit" bindtap="previewImage" data-src="{{item.image}}" />
+    <view class="diary-text">{{item.text}}</view>
+    <view class="delete-icon" bindtap="deleteDiary" data-index="{{index}}">🗑️</view>
+    <view class="diary-meta">
+      <text>{{item.date}}</text>
+      <text class="star-icon">{{item.important ? '⭐' : '☆'}}</text>
+    </view>
+  </view>
+</view>

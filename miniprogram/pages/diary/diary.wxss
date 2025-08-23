@@ -1,0 +1,56 @@
+
+.diary-page {
+    padding: 30rpx;
+    background-color: #FFFDF7;
+    min-height: 100vh;
+  }
+  
+.header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20rpx;
+  }
+  
+  .section-title {
+    font-size: 36rpx;
+    font-weight: 700;
+    color: #A8D5BA;
+    margin-bottom: 20rpx;
+  }
+  
+.close-button {
+    font-size: 40rpx;
+    font-weight: bold;
+    color: #D8B4A0;
+    padding: 0 20rpx;
+  }
+  
+  .form-item {
+    margin-bottom: 30rpx;
+  }
+  
+  .form-item text {
+    display: block;
+    font-size: 28rpx;
+    color: #D8B4A0;
+    margin-bottom: 10rpx;
+  }
+  
+  textarea, input {
+    width: 100%;
+    border: 1px solid #D8B4A0;
+    border-radius: 8rpx;
+    padding: 16rpx;
+    font-size: 28rpx;
+    background-color: #FFF;
+  }
+  
+  .btn-fill {
+    background-color: #A8D5BA;
+    color: #fff;
+    border-radius: 8rpx;
+    padding: 20rpx;
+    text-align: center;
+    font-size: 30rpx;
+  }

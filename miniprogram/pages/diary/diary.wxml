@@ -1,0 +1,43 @@
+<view class="diary-page">
+  <view class="header-row">
+    <view class="section-title">新增日记</view>
+    <view class="close-button" bindtap="goBack">×</view>
+  </view>
+
+  <!-- 上传照片/视频 -->
+  <view class="form-item">
+    <text>照片/视频</text>
+    <button bindtap="chooseMedia">选择文件</button>
+    <image src="{{mediaPath}}" mode="aspectFill" wx:if="{{mediaPath}}" />
+  </view>
+
+  <!-- 添加文字 -->
+  <view class="form-item">
+    <text>文字内容</text>
+    <textarea placeholder="写下今天的心情..." bindinput="onTextInput" />
+  </view>
+
+  <!-- 添加时间 -->
+  <view class="form-item">
+    <text>时间</text>
+    <picker mode="date" bindchange="onDateChange">
+      <view>{{selectedDate}}</view>
+    </picker>
+  </view>
+
+  <!-- 添加标签 -->
+  <view class="form-item">
+    <text>标签</text>
+    <input placeholder="如：阳光、朋友、旅行" bindinput="onTagInput" />
+  </view>
+
+  <!-- 标记重要性 -->
+  <view class="form-item">
+    <text>重要性</text>
+    <switch checked="{{isImportant}}" bindchange="onImportanceChange" />
+    <text>{{isImportant ? '重要' : '一般'}}</text>
+  </view>
+
+  <!-- 提交按钮 -->
+  <button class="btn-fill" bindtap="submitDiary">保存日记</button>
+</view>
