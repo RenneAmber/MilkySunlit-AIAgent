@@ -1,0 +1,600 @@
+﻿.love-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #000000;
+}
+
+.sky-vignette {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  z-index: 1;
+}
+
+.galaxy-band,
+.galaxy-flow,
+.nebula,
+.stardust-layer,
+.star-layer,
+.meteor-layer,
+.sparkle-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.galaxy-band {
+  z-index: 1;
+  opacity: 0.95;
+  mix-blend-mode: screen;
+}
+
+.galaxy-flow {
+  z-index: 2;
+  inset: -18% -34%;
+  transform: rotate(-24deg) scale(1.3);
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255, 248, 230, 0.18) 0%, rgba(206, 220, 255, 0.14) 12%, rgba(138, 158, 255, 0.1) 24%, rgba(0, 0, 0, 0) 52%),
+    radial-gradient(circle at 18% 46%, rgba(255, 255, 255, 0.08) 0 1.6rpx, transparent 3rpx),
+    radial-gradient(circle at 26% 56%, rgba(255, 245, 218, 0.07) 0 1.4rpx, transparent 2.8rpx),
+    radial-gradient(circle at 38% 50%, rgba(220, 232, 255, 0.08) 0 1.4rpx, transparent 2.8rpx),
+    radial-gradient(circle at 52% 58%, rgba(255, 255, 255, 0.07) 0 1.4rpx, transparent 2.8rpx),
+    radial-gradient(circle at 66% 52%, rgba(255, 246, 224, 0.08) 0 1.6rpx, transparent 3rpx),
+    radial-gradient(circle at 78% 60%, rgba(206, 220, 255, 0.08) 0 1.6rpx, transparent 3rpx);
+  filter: blur(8rpx);
+  mix-blend-mode: screen;
+  animation: galaxyFlowMove 22s linear infinite, galaxyFlowPulse 9s ease-in-out infinite alternate;
+}
+
+.galaxy-band-a {
+  inset: -18% -34%;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255, 246, 220, 0.28) 0%, rgba(214, 224, 255, 0.2) 12%, rgba(134, 154, 255, 0.14) 24%, rgba(76, 98, 186, 0.08) 36%, rgba(0, 0, 0, 0) 58%),
+    radial-gradient(ellipse at 48% 48%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 54%);
+  transform: rotate(-24deg) scale(1.3);
+  filter: blur(14rpx);
+  animation: galaxyDrift 22s ease-in-out infinite alternate;
+}
+
+.galaxy-band-b {
+  inset: -12% -28%;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(250, 238, 208, 0.14) 0%, rgba(170, 188, 255, 0.1) 20%, rgba(0, 0, 0, 0) 54%),
+    radial-gradient(circle at 28% 44%, rgba(255, 255, 255, 0.06) 0 1.4rpx, transparent 2.6rpx),
+    radial-gradient(circle at 54% 56%, rgba(255, 245, 220, 0.06) 0 1.4rpx, transparent 2.6rpx),
+    radial-gradient(circle at 72% 48%, rgba(220, 232, 255, 0.06) 0 1.2rpx, transparent 2.4rpx);
+  transform: rotate(-24deg) scale(1.12);
+  filter: blur(24rpx);
+  animation: galaxyDrift 18s ease-in-out infinite alternate-reverse;
+}
+
+.nebula {
+  position: absolute;
+  inset: -20% -10%;
+  z-index: 3;
+  filter: blur(24rpx);
+}
+
+.nebula-a {
+  background:
+    radial-gradient(circle at 18% 26%, rgba(44, 92, 196, 0.22), transparent 20%),
+    radial-gradient(circle at 72% 18%, rgba(38, 72, 184, 0.18), transparent 18%),
+    radial-gradient(circle at 60% 76%, rgba(16, 118, 164, 0.16), transparent 20%);
+  animation: breath 12s ease-in-out infinite alternate;
+}
+
+.nebula-b {
+  background:
+    radial-gradient(circle at 38% 58%, rgba(98, 68, 188, 0.14), transparent 20%),
+    radial-gradient(circle at 82% 70%, rgba(28, 88, 150, 0.14), transparent 20%),
+    radial-gradient(circle at 12% 84%, rgba(54, 74, 148, 0.12), transparent 18%);
+  animation: breath 16s ease-in-out infinite alternate-reverse;
+}
+
+.stardust-layer {
+  z-index: 3;
+  inset: -10% -4%;
+  background:
+    radial-gradient(circle at 14% 22%, rgba(255, 255, 255, 0.07) 0 1.4rpx, transparent 2.6rpx),
+    radial-gradient(circle at 22% 68%, rgba(255, 246, 216, 0.05) 0 1.2rpx, transparent 2.4rpx),
+    radial-gradient(circle at 41% 32%, rgba(255, 255, 255, 0.06) 0 1.2rpx, transparent 2.2rpx),
+    radial-gradient(circle at 62% 46%, rgba(196, 214, 255, 0.05) 0 1.2rpx, transparent 2.4rpx),
+    radial-gradient(circle at 78% 24%, rgba(255, 248, 232, 0.06) 0 1.6rpx, transparent 2.8rpx),
+    radial-gradient(circle at 86% 72%, rgba(210, 224, 255, 0.05) 0 1.4rpx, transparent 2.6rpx);
+  filter: blur(0.6rpx);
+  opacity: 0.85;
+}
+
+.star-layer { z-index: 4; }
+.meteor-layer { z-index: 4; }
+.sparkle-layer { z-index: 4; }
+
+.star {
+  position: absolute;
+  border-radius: 999rpx;
+  animation-name: twinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  opacity: 0.9;
+}
+
+.meteor {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation-name: meteorRun;
+  animation-timing-function: cubic-bezier(0.18, 0.42, 0.34, 0.96);
+  animation-iteration-count: infinite;
+  opacity: 0;
+}
+
+.meteor-track {
+  display: flex;
+  align-items: center;
+  filter: blur(0.3rpx);
+}
+
+.meteor-tail {
+  height: 2rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(140, 150, 255, 0.3) 34%, rgba(220, 225, 255, 0.9) 100%);
+  box-shadow: 0 0 10rpx rgba(150, 160, 255, 0.28);
+}
+
+.meteor-glow {
+  width: 18rpx;
+  height: 6rpx;
+  margin-left: -8rpx;
+  border-radius: 999rpx;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.88) 0%, rgba(170, 160, 255, 0.45) 52%, rgba(255, 255, 255, 0) 100%);
+  filter: blur(1.2rpx);
+}
+
+.meteor-head {
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.98) 0%, rgba(214, 210, 255, 0.7) 58%, rgba(200, 190, 255, 0.15) 100%);
+  box-shadow: 0 0 10rpx rgba(190, 170, 255, 0.62);
+}
+
+.sparkle {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200, 180, 255, 0.95) 0%, rgba(140, 120, 255, 0.2) 65%, rgba(255, 255, 255, 0) 100%);
+  box-shadow: 0 0 12rpx rgba(180, 160, 255, 0.4);
+  animation: sparkleBlink ease-in-out infinite;
+}
+
+.back-btn {
+  position: fixed;
+  top: 36rpx;
+  right: 26rpx;
+  z-index: 20;
+  padding: 0 24rpx;
+  min-width: 132rpx;
+  line-height: 52rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  font-size: 20rpx;
+  color: #0a0e2a;
+  background: linear-gradient(130deg, rgba(178, 193, 255, 0.96) 0%, rgba(128, 147, 255, 0.94) 100%);
+  box-shadow: 0 8rpx 18rpx rgba(84, 105, 220, 0.42);
+  border: 1px solid rgba(205, 216, 255, 0.55);
+}
+
+.calendar-wrap {
+  position: relative;
+  z-index: 8;
+  padding: 110rpx 24rpx 48rpx;
+}
+
+.calendar-card,
+.details-card {
+  border-radius: 24rpx;
+  border: 1px solid rgba(170, 186, 255, 0.25);
+  background: linear-gradient(145deg, rgba(12, 22, 62, 0.72), rgba(18, 30, 78, 0.62));
+  box-shadow: 0 18rpx 44rpx rgba(3, 7, 28, 0.46);
+  backdrop-filter: blur(8rpx);
+}
+
+.calendar-card {
+  padding: 26rpx;
+}
+
+.details-card {
+  margin-top: 18rpx;
+  padding: 18rpx;
+}
+
+.calendar-title {
+  color: #edf3ff;
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.calendar-subtitle,
+.calendar-owner,
+.details-header,
+.item-meta {
+  color: rgba(206, 220, 255, 0.88);
+  font-size: 22rpx;
+}
+
+.calendar-subtitle {
+  margin-top: 8rpx;
+}
+
+.calendar-owner {
+  margin-top: 8rpx;
+}
+
+/* Month Navigation */
+.month-navigation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.month-label {
+  color: #edf3ff;
+  font-size: 28rpx;
+  font-weight: 600;
+  min-width: 160rpx;
+  text-align: center;
+}
+
+.month-btn {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #edf3ff;
+  font-size: 28rpx;
+  background: rgba(84, 105, 220, 0.28);
+  border: 1px solid rgba(170, 186, 255, 0.35);
+  cursor: pointer;
+}
+
+.month-btn:active {
+  background: rgba(84, 105, 220, 0.48);
+}
+
+/* Calendar Grid */
+.calendar-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4rpx;
+  margin-bottom: 8rpx;
+}
+
+.week-day {
+  text-align: center;
+  color: rgba(206, 220, 255, 0.78);
+  font-size: 20rpx;
+  font-weight: 600;
+  padding: 8rpx 0;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4rpx;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  border-radius: 12rpx;
+  border: 1px solid rgba(170, 186, 255, 0.18);
+  background: rgba(10, 20, 50, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.calendar-day.other-month {
+  opacity: 0.4;
+  background: transparent;
+  border: none;
+}
+
+.calendar-day.current-month {
+  color: #edf3ff;
+}
+
+.calendar-day.today {
+  border-color: #93a6ff;
+  background: rgba(84, 105, 220, 0.22);
+}
+
+.calendar-day.has-events {
+  border-color: #d0a6ff;
+  background: rgba(110, 85, 180, 0.25);
+}
+
+.calendar-day.selected {
+  border-color: #7dd3fc;
+  background: linear-gradient(135deg, rgba(125, 211, 252, 0.28) 0%, rgba(59, 130, 246, 0.18) 100%);
+}
+
+.calendar-day:active {
+  transform: scale(0.95);
+}
+
+.day-number {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #dbe6ff;
+}
+
+.event-indicator {
+  position: absolute;
+  top: 2rpx;
+  right: 4rpx;
+  font-size: 14rpx;
+  color: #fbbf24;
+}
+
+/* Details Card */
+.details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+  padding-bottom: 12rpx;
+  border-bottom: 1px solid rgba(170, 186, 255, 0.15);
+}
+
+.selected-date-display {
+  color: #edf3ff;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.event-count {
+  color: rgba(206, 220, 255, 0.88);
+  font-size: 22rpx;
+}
+
+.add-form {
+  margin-bottom: 16rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1px solid rgba(170, 186, 255, 0.15);
+}
+
+.form-row {
+  margin-top: 12rpx;
+}
+
+.form-row-note {
+  margin-top: 12rpx;
+}
+
+.label {
+  color: #dbe6ff;
+  font-size: 22rpx;
+  margin-bottom: 6rpx;
+}
+
+.text-input,
+.text-area {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 12rpx;
+  border: 1px solid rgba(173, 193, 255, 0.28);
+  background: rgba(6, 12, 36, 0.56);
+  color: #eef3ff;
+  padding: 12rpx;
+  font-size: 23rpx;
+}
+
+.text-input {
+  height: 56rpx;
+}
+
+.text-area {
+  min-height: 100rpx;
+  line-height: 1.6;
+}
+
+.action-row {
+  margin-top: 12rpx;
+}
+
+.action-btn {
+  height: 60rpx;
+  line-height: 60rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  color: #11183f;
+  font-size: 26rpx;
+  font-weight: 600;
+  background: linear-gradient(135deg, #b6c5ff 0%, #93a6ff 100%);
+  box-shadow: 0 8rpx 18rpx rgba(112, 129, 255, 0.32);
+  cursor: pointer;
+}
+
+.events-list {
+  padding-top: 8rpx;
+}
+
+.empty {
+  color: rgba(206, 220, 255, 0.74);
+  font-size: 22rpx;
+  padding: 12rpx 8rpx;
+  text-align: center;
+}
+
+.calendar-item {
+  border-radius: 18rpx;
+  border: 1px solid rgba(172, 194, 255, 0.2);
+  background: rgba(10, 16, 46, 0.66);
+  padding: 14rpx;
+  margin-top: 10rpx;
+}
+
+.item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.item-title {
+  color: #eef3ff;
+  font-size: 28rpx;
+  font-weight: 600;
+  flex: 1;
+}
+
+.item-user {
+  color: #c8d8ff;
+  font-size: 22rpx;
+  white-space: nowrap;
+}
+
+.item-note {
+  margin-top: 8rpx;
+  color: #dde7ff;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.item-meta {
+  margin-top: 8rpx;
+}
+
+.item-actions {
+  margin-top: 10rpx;
+  display: flex;
+  gap: 12rpx;
+  justify-content: flex-end;
+}
+
+.mini-subscribe {
+  min-width: 140rpx;
+  text-align: center;
+  height: 56rpx;
+  line-height: 56rpx;
+  border-radius: 999rpx;
+  color: #f4f7ff;
+  font-size: 24rpx;
+  background: linear-gradient(135deg, rgba(111, 129, 255, 0.9) 0%, rgba(120, 89, 232, 0.9) 100%);
+}
+
+.mini-test {
+  min-width: 140rpx;
+  text-align: center;
+  height: 56rpx;
+  line-height: 56rpx;
+  border-radius: 999rpx;
+  color: #173253;
+  font-size: 24rpx;
+  background: linear-gradient(135deg, #ffe9a8 0%, #ffd07c 100%);
+}
+
+.mini-delete {
+  min-width: 120rpx;
+  text-align: center;
+  height: 56rpx;
+  line-height: 56rpx;
+  border-radius: 999rpx;
+  color: #451223;
+  font-size: 24rpx;
+  background: linear-gradient(135deg, #ffcfda 0%, #f8a7be 100%);
+}
+
+.anniversary-item {
+  padding: 18rpx 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.anniversary-item:last-child {
+  border-bottom: none;
+}
+
+.anniversary-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10rpx;
+}
+
+.anniversary-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.anniversary-date {
+  font-size: 24rpx;
+  color: rgba(200, 180, 255, 0.8);
+}
+
+@keyframes twinkle {
+  0%, 100% {
+    transform: scale(0.65);
+    opacity: 0.18;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+}
+
+@keyframes meteorRun {
+  0% { opacity: 0; transform: translate3d(-80rpx, -140rpx, 0); }
+  2% { opacity: 0.72; }
+  10% { opacity: 0.62; }
+  14% { opacity: 0.08; }
+  15%, 100% { opacity: 0; transform: translate3d(760rpx, 820rpx, 0); }
+}
+
+@keyframes sparkleBlink {
+  0%, 100% {
+    transform: scale(0.5);
+    opacity: 0.1;
+  }
+  46% {
+    transform: scale(1.4);
+    opacity: 0.9;
+  }
+  76% {
+    transform: scale(0.85);
+    opacity: 0.32;
+  }
+}
+
+@keyframes breath {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  100% {
+    transform: scale(1.1) rotate(2deg);
+  }
+}
+
+@keyframes galaxyDrift {
+  0% { transform: rotate(-26deg) scale(1.24) translate3d(-18rpx, 0, 0); }
+  100% { transform: rotate(-22deg) scale(1.32) translate3d(18rpx, -12rpx, 0); }
+}
+
+@keyframes galaxyFlowMove {
+  0% { transform: rotate(-24deg) scale(1.3) translate3d(-36rpx, 0, 0); }
+  100% { transform: rotate(-24deg) scale(1.3) translate3d(36rpx, 0, 0); }
+}
+
+@keyframes galaxyFlowPulse {
+  0% { opacity: 0.46; }
+  100% { opacity: 0.82; }
+}

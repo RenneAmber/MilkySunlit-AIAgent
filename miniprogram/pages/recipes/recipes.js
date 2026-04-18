@@ -1,0 +1,197 @@
+function parseLines(text, maxLen = 30) {
+  return String(text || "")
+    .split(/\n+/)
+    .map((line) => String(line || "").replace(/^\s*\d+[.、)）]\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, maxLen);
+}
+
+function toArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((it) => String(it || "").trim()).filter(Boolean);
+  }
+  const text = String(value || "").trim();
+  if (!text) {
+    return [];
+  }
+  return text
+    .split(/[\n,，;；、]+/)
+    .map((it) => String(it || "").trim())
+    .filter(Boolean);
+}
+
+function normalizeRecipeItem(item = {}) {
+  const ingredients = toArray(item.ingredients || item.ingredientsText || item.ingredient || item.materials);
+  const steps = toArray(item.steps || item.stepsText || item.method || item.instructions).map((line) =>
+    String(line || "").replace(/^\s*\d+[.、)）]\s*/, "").trim()
+  );
+  return {
+    ...item,
+    ingredients,
+    steps,
+    ingredientsDisplay: ingredients.join("、"),
+    stepsDisplay: steps,
+  };
+}
+
+function showErrorToast(error, fallback = "操作失败") {
+  const msg = String((error && error.message) || fallback).trim();
+  wx.showToast({
+    title: msg.slice(0, 20) || fallback,
+    icon: "none",
+  });
+}
+
+Page({
+  data: {
+    list: [],
+    loading: false,
+    adding: false,
+    editingId: "",
+    showAddForm: false,
+    keyword: "",
+    name: "",
+    ingredientsText: "",
+    stepsText: "",
+    link: "",
+    note: "",
+  },
+
+  onShow() {
+    this.loadList();
+  },
+
+  startAddRecipe() {
+    this.setData({ showAddForm: true });
+  },
+
+  onInput(e) {
+    const field = e.currentTarget.dataset.field;
+    this.setData({ [field]: e.detail.value });
+  },
+
+  async loadList() {
+    this.setData({ loading: true });
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: "adminAuth",
+        data: {
+          action: "listSharedRecipes",
+          keyword: this.data.keyword,
+          limit: 100,
+        },
+      });
+      const list = ((result && result.recipeList) || []).map(normalizeRecipeItem);
+      this.setData({ list });
+    } catch (error) {
+      showErrorToast(error, "加载失败");
+    } finally {
+      this.setData({ loading: false });
+    }
+  },
+
+  async search() {
+    await this.loadList();
+  },
+
+  async addRecipe() {
+    const editingId = String(this.data.editingId || "").trim();
+    const name = String(this.data.name || "").trim();
+    const ingredients = parseLines(this.data.ingredientsText, 80);
+    const steps = parseLines(this.data.stepsText, 120);
+    const link = String(this.data.link || "").trim();
+    const note = String(this.data.note || "").trim();
+
+    if (!name || !ingredients.length || !steps.length) {
+      wx.showToast({ title: "请填写名称/食材/步骤", icon: "none" });
+      return;
+    }
+
+    this.setData({ adding: true });
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: "adminAuth",
+        data: {
+          action: editingId ? "updateSharedRecipe" : "addSharedRecipe",
+          id: editingId || undefined,
+          name,
+          ingredients,
+          steps,
+          link,
+          note,
+        },
+      });
+      if (!(result && result.success)) {
+        throw new Error((result && result.error) || (editingId ? "保存失败" : "新增失败"));
+      }
+      wx.showToast({ title: editingId ? "已保存" : "已新增", icon: "success" });
+      this.setData({ showAddForm: false });
+      this.cancelEdit({ silent: true });
+      await this.loadList();
+    } catch (error) {
+      showErrorToast(error, editingId ? "保存失败" : "新增失败");
+    } finally {
+      this.setData({ adding: false });
+    }
+  },
+
+  startEditRecipe(e) {
+    const id = e.currentTarget.dataset.id;
+    const target = (this.data.list || []).find((it) => String(it.id) === String(id));
+    if (!target) {
+      wx.showToast({ title: "未找到菜谱", icon: "none" });
+      return;
+    }
+    this.setData({
+      editingId: target.id,
+      name: target.name || "",
+      ingredientsText: (target.ingredients || []).join("\n"),
+      stepsText: (target.steps || []).join("\n"),
+      link: target.link || "",
+      note: target.note || "",
+      showAddForm: true,
+    });
+  },
+
+  cancelEdit(options = {}) {
+    this.setData({
+      editingId: "",
+      name: "",
+      ingredientsText: "",
+      stepsText: "",
+      link: "",
+      note: "",
+      showAddForm: false,
+    });
+    if (!options.silent) {
+      wx.showToast({ title: "已取消编辑", icon: "none" });
+    }
+  },
+
+  async deleteRecipe(e) {
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    const { confirm } = await wx.showModal({
+      title: "确认删除",
+      content: "删除后不可恢复，继续吗？",
+    });
+    if (!confirm) return;
+
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: "adminAuth",
+        data: {
+          action: "deleteSharedRecipe",
+          id,
+        },
+      });
+      if (!(result && result.success)) {
+        throw new Error((result && result.error) || "删除失败");
+      }
+      wx.showToast({ title: "已删除", icon: "success" });
+      await this.loadList();
+    } catch (error) {
+      showErrorToast(error, "删除失败");
+    }
+  },
+});

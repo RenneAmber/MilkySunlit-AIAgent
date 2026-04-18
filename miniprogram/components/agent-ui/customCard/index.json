@@ -1,4 +1,9 @@
 {
   "component": true,
-  "usingComponents": {}
+  "usingComponents": {
+    "custom-map": "/components/toolCard/map/index",
+    "custom-weather": "/components/toolCard/weather/index",
+    "custom-food-list": "/components/toolCard/food-list/index",
+    "custom-business-list": "/components/toolCard/business-list/index"
+  }
 }

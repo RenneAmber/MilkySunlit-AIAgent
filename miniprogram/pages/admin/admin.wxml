@@ -1,0 +1,101 @@
+<view class="admin-page">
+  <view class="admin-card" wx:if="{{loading}}">
+    <view class="title">正在校验身份</view>
+    <view class="desc">请稍候...</view>
+  </view>
+
+  <view class="admin-card denied" wx:elif="{{!isAdmin}}">
+    <view class="title">无权限访问</view>
+    <view class="desc">当前账号不是管理员，无法查看后台数据。</view>
+    <view class="btn" bind:tap="goBack">返回首页</view>
+  </view>
+
+  <view wx:elif="{{isAdmin}}" class="admin-wrap">
+    <view class="admin-header">
+      <view class="title">Admin 控制台</view>
+      <view class="desc">仅管理员可见的数据面板</view>
+      <view class="env-tip" wx:if="{{envId}}">当前云环境：{{envId}}</view>
+      <view class="filter-row">
+        <view class="filter-label">按用户名筛选</view>
+        <view class="filter-options">
+          <view
+            wx:for="{{userFilterOptions}}"
+            wx:key="*this"
+            class="filter-chip {{selectedUserFilter === item ? 'filter-chip-active' : ''}}"
+            bind:tap="onSelectUserFilter"
+            data-value="{{item}}"
+          >{{item === 'all' ? '全部' : item}}</view>
+        </view>
+      </view>
+      <view class="btn-row">
+        <view class="btn" bind:tap="refreshData">刷新数据</view>
+        <view class="btn btn-light" bind:tap="goBack">返回首页</view>
+      </view>
+    </view>
+
+    <view class="stats-box">
+      <view class="stats-item">
+        <view class="stats-label">日记总数</view>
+        <view class="stats-value">{{diaryCount}}</view>
+      </view>
+      <view class="stats-item stats-item-gap">
+        <view class="stats-label">测试问答数</view>
+        <view class="stats-value">{{chatLogCount}}</view>
+      </view>
+      <view class="stats-item stats-item-gap">
+        <view class="stats-label">错误问答数</view>
+        <view class="stats-value stats-value-warn">{{chatErrorCount}}</view>
+      </view>
+    </view>
+
+    <view class="list-box" wx:if="{{loadErrors.length}}">
+      <view class="list-title">后台加载错误</view>
+      <view class="error-hint">请在上面显示的云环境中创建集合：diaryList、chat_logs</view>
+      <view class="error-card" wx:for="{{loadErrors}}" wx:key="collection">
+        <view class="error-content" selectable="true">
+          <view class="error-title">{{item.collection}}</view>
+          <view class="error-text">{{item.message}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="list-box">
+      <view class="list-title">最近日记（{{selectedUserFilter === 'all' ? '全部用户' : selectedUserFilter}}，前 {{diaryList.length}} / 共 {{diaryCount}} 条）</view>
+      <view class="empty" wx:if="{{diaryList.length === 0}}">暂无云端数据</view>
+      <view class="diary-card" wx:for="{{diaryList}}" wx:key="_id">
+        <view class="diary-content" selectable="true">
+          <view class="diary-text">{{item.text || '（无文本）'}}</view>
+          <view class="diary-meta">日期：{{item.date || ''}}</view>
+          <view class="diary-meta">创建时间：{{item.createdAtText}}</view>
+          <view class="diary-meta">用户：{{item.userLabelText}}</view>
+          <view class="diary-meta">重要：{{item.important ? '是' : '否'}}</view>
+        </view>
+        <view class="card-actions">
+          <view class="mini-btn mini-btn-danger" bind:tap="deleteDiary" data-id="{{item._id}}">{{deletingDiaryId === item._id ? '删除中...' : '删除'}}</view>
+        </view>
+      </view>
+      <view class="load-more" wx:if="{{diaryHasMore}}" bind:tap="loadMoreDiaries">{{diaryLoadingMore ? '加载中...' : '加载更多日记'}}</view>
+    </view>
+
+    <view class="list-box">
+      <view class="list-title">聊天历史与问答日志（{{selectedUserFilter === 'all' ? '全部用户' : selectedUserFilter}}，前 {{chatLogList.length}} / 共 {{chatLogCount}} 条）</view>
+      <view class="empty" wx:if="{{chatLogList.length === 0}}">暂无测试问答数据</view>
+      <view class="log-card" wx:for="{{chatLogList}}" wx:key="_id" wx:for-index="index">
+        <view class="log-content" selectable="true">
+          <view class="log-question">Q：{{item.question || '（无问题）'}}</view>
+          <view class="log-answer">A：{{item.detailExpanded ? (item.answer || '（无回答）') : (item.answerSummary || '点击查看详情')}}</view>
+          <view class="log-meta">状态：{{item.statusText}} | 用时：{{item.durationText}}</view>
+          <view class="log-meta">用户标识：{{item.userDisplay}}</view>
+          <view class="log-meta">OpenID：{{item.openidMasked}}</view>
+          <view class="log-meta">时间：{{item.createdAtText}}</view>
+          <view class="log-error" wx:if="{{item.errorText}}">错误原因：{{item.errorText}}</view>
+        </view>
+        <view class="card-actions">
+          <view class="mini-btn" bind:tap="toggleChatLogDetail" data-id="{{item._id}}" data-index="{{index}}">{{detailLoadingId === item._id ? '加载中...' : (item.detailExpanded ? '收起详情' : '查看详情')}}</view>
+          <view class="mini-btn mini-btn-danger" bind:tap="deleteChatLog" data-id="{{item._id}}">{{deletingChatLogId === item._id ? '删除中...' : '删除'}}</view>
+        </view>
+      </view>
+      <view class="load-more" wx:if="{{chatLogHasMore}}" bind:tap="loadMoreChatLogs">{{chatLogLoadingMore ? '加载中...' : '加载更多日志'}}</view>
+    </view>
+  </view>
+</view>

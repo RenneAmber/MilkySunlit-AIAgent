@@ -1,15 +1,26 @@
 <view class="history-page"> 
   <view class="header-row">
-    <view class="section-title">历史日记</view>
-    <view class="add-button" bindtap="goToAddDiary">＋</view>
+    <view>
+      <view class="section-title">历史日记</view>
+      <view class="section-subtitle">未同步云端：{{unsyncedCount}} 条</view>
+    </view>
+    <view class="header-actions">
+      <view class="migrate-button" bindtap="migrateLocalDiaries">{{migrating ? '迁移中...' : (unsyncedCount ? '迁移未同步(' + unsyncedCount + ')' : '全部已同步')}}</view>
+      <view class="add-button" bindtap="goToAddDiary">＋</view>
+    </view>
   </view>
   <view wx:for="{{diaryList}}" wx:key="index" class="diary-card">
     <image src="{{item.image}}" wx:if="{{item.image}}" class="diary-image" mode="aspectFit" bindtap="previewImage" data-src="{{item.image}}" />
     <view class="diary-text">{{item.text}}</view>
-    <view class="delete-icon" bindtap="deleteDiary" data-index="{{index}}">🗑️</view>
+    <view class="tag-row" wx:if="{{item.tags && item.tags.length}}">
+      <text class="tag-item" wx:for="{{item.tags}}" wx:key="*this">#{{item}}</text>
+    </view>
+    <view class="delete-icon" bindtap="deleteDiary" data-index="{{index}}" data-id="{{item._id}}" data-sync-key="{{item.syncKey}}">🗑️</view>
     <view class="diary-meta">
       <text>{{item.date}}</text>
       <text class="star-icon">{{item.important ? '⭐' : '☆'}}</text>
     </view>
+    <view class="sync-state" wx:if="{{item.userLabel}}">来源：{{item.userLabel}}</view>
+    <view class="sync-state">{{item._id ? '已同步云端' : '仅本地'}}</view>
   </view>
 </view>

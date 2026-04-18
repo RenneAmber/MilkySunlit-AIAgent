@@ -1,29 +1,112 @@
-<view class="page">
-  <view class="title">
-    奶菠小筑
-  </view>
-  <view class="sub-title">
-    属于小菠萝与牛奶小姐的阳光物语
-  </view>
-  <view class="btn-box">
-    <view class="btn-fill" bind:tap="goToHistoryDiary">奶菠日记</view>
-    <view class="btn-light" bind:tap="goChatBot">奶菠陪聊</view>
+﻿<view class="page">
+  <view class="sky-vignette"></view>
+  <view class="galaxy-band galaxy-band-a"></view>
+  <view class="galaxy-band galaxy-band-b"></view>
+  <view class="galaxy-flow"></view>
+  <view class="nebula nebula-a"></view>
+  <view class="nebula nebula-b"></view>
+  <view class="stardust-layer"></view>
+
+  <view class="star-layer">
+    <view
+      wx:for="{{stars}}"
+      wx:key="id"
+      class="star"
+      style="left: {{item.left}}%; top: {{item.top}}%; width: {{item.size}}rpx; height: {{item.size}}rpx; animation-delay: -{{item.delay}}s; animation-duration: {{item.duration}}s; {{item.colorStyle}}"
+    ></view>
   </view>
 
-  <view class="function-box">
-    <view class="function-box-title" bind:tap="expandModel" id="anchor1">
-      <text>重要日记</text>
-      <image src="../../imgs/arrow.png" mode="widthFix" style="width: 16px;height: 16px;transform-origin: center center;transform: rotate({{modelExpand?90:0}}deg);" />
+  <view class="meteor-layer">
+    <view
+      wx:for="{{meteors}}"
+      wx:key="id"
+      class="meteor"
+      style="left: {{item.left}}%; top: {{item.top}}%; animation-delay: -{{item.delay}}s; animation-duration: {{item.duration}}s; opacity: {{item.opacity}};"
+    >
+      <view class="meteor-track" style="transform: rotate({{item.angle}}deg) scale({{item.scale}});">
+        <view class="meteor-tail" style="width: {{item.tail}}rpx; {{item.tailStyle}}"></view>
+        <view class="meteor-glow" style="{{item.glowStyle}}"></view>
+        <view class="meteor-head" style="{{item.headStyle}}"></view>
+      </view>
     </view>
-    <view wx:if="{{modelExpand}}">
-        <view wx:for="{{diaryList}}" wx:key="index" wx:if="{{item.important}}" class="diary-card">
-            <image src="{{item.image}}" wx:if="{{item.image}}" class="diary-image" mode="aspectFit" bindtap="previewImage" data-src="{{item.image}}" />
-            <view class="diary-text">{{item.text}}</view>
-            <view class="delete-icon" bindtap="deleteDiary" data-index="{{index}}">🗑️</view>
-            <view class="diary-meta">
-                <text>{{item.date}}</text>
-            </view>
+  </view>
+
+  <view class="sparkle-layer">
+    <view
+      wx:for="{{sparkles}}"
+      wx:key="id"
+      class="sparkle"
+      style="left: {{item.left}}%; top: {{item.top}}%; width: {{item.size}}rpx; height: {{item.size}}rpx; animation-delay: -{{item.delay}}s; animation-duration: {{item.duration}}s; opacity: {{item.opacity}};"
+    ></view>
+  </view>
+
+  <view class="page-content">
+    <view class="hero-card">
+      <view class="title">奶菠小筑</view>
+      <view class="sub-title">属于小菠萝与牛奶小姐的阳光物语</view>
+      <view class="btn-box">
+        <view class="btn-fill" bind:tap="goToHistoryDiary">奶菠日记</view>
+        <view class="btn-light" bind:tap="goChatBot">奶菠陪聊</view>
+        <view class="btn-glow" bind:tap="goLove">共享日历</view>
+        <view class="btn-light" bind:tap="goBookkeeping">共享记账</view>
+        <view class="btn-glow" bind:tap="goRecipes">共享菜谱</view>
+        <view wx:if="{{isAdmin}}" class="btn-admin" bind:tap="goAdmin">Admin</view>
+      </view>
+    </view>
+
+    <view class="function-box">
+      <view class="overview-tab-row" id="anchor1">
+        <view class="overview-tab {{activeOverviewTab === 'diary' ? 'overview-tab-active' : ''}}" data-tab="diary" bind:tap="switchOverviewTab">重要日记</view>
+        <view class="overview-tab {{activeOverviewTab === 'upcoming' ? 'overview-tab-active' : ''}}" data-tab="upcoming" bind:tap="switchOverviewTab">下个事项</view>
+      </view>
+
+      <view wx:if="{{activeOverviewTab === 'upcoming'}}">
+        <view class="upcoming-toolbar">
+          <view class="range-chip-row">
+            <view class="range-chip {{upcomingRange === 'next' ? 'range-chip-active' : ''}}" data-range="next" bind:tap="switchUpcomingRange">下一个</view>
+            <view class="range-chip {{upcomingRange === 'day' ? 'range-chip-active' : ''}}" data-range="day" bind:tap="switchUpcomingRange">近一天</view>
+            <view class="range-chip {{upcomingRange === 'week' ? 'range-chip-active' : ''}}" data-range="week" bind:tap="switchUpcomingRange">近一周</view>
+            <view class="range-chip {{upcomingRange === 'month' ? 'range-chip-active' : ''}}" data-range="month" bind:tap="switchUpcomingRange">近一月</view>
+          </view>
+          <view class="refresh-chip" bind:tap="refreshUpcomingSummary">{{upcomingRefreshing ? '刷新中...' : '刷新'}}</view>
         </view>
+
+        <view class="next-item-panel">
+          <view class="next-section-title">日历事项</view>
+          <view wx:if="{{upcomingCalendarList.length}}">
+            <view class="upcoming-card upcoming-card-calendar" wx:for="{{upcomingCalendarList}}" wx:key="id">
+              <view class="upcoming-date">{{item.date}}</view>
+              <view class="upcoming-title">{{item.title}}</view>
+              <view class="upcoming-detail">{{item.detail}}</view>
+            </view>
+          </view>
+          <view wx:else class="empty-hint">当前范围内暂无日历事项</view>
+
+          <view class="next-section-title bookkeeping-section-title">记账事项</view>
+          <view wx:if="{{upcomingBookkeepingList.length}}">
+            <view class="upcoming-card upcoming-card-bookkeeping" wx:for="{{upcomingBookkeepingList}}" wx:key="id">
+              <view class="upcoming-date">{{item.date}}</view>
+              <view class="upcoming-title">{{item.title}}</view>
+              <view class="upcoming-detail">{{item.detail}}</view>
+            </view>
+          </view>
+          <view wx:else class="empty-hint">当前范围内暂无记账事项</view>
+        </view>
+      </view>
+
+      <view wx:if="{{activeOverviewTab === 'diary'}}">
+        <view wx:for="{{diaryList}}" wx:key="index" wx:if="{{item.important}}" class="diary-card">
+          <image src="{{item.image}}" wx:if="{{item.image}}" class="diary-image" mode="aspectFit" bindtap="previewImage" data-src="{{item.image}}" />
+          <view class="diary-text">{{item.text}}</view>
+          <view class="tag-row" wx:if="{{item.tags && item.tags.length}}">
+            <text class="tag-item" wx:for="{{item.tags}}" wx:key="*this">#{{item}}</text>
+          </view>
+          <view class="delete-icon" bindtap="deleteDiary" data-index="{{index}}"></view>
+          <view class="diary-meta">
+            <text>{{item.date}}</text>
+          </view>
+        </view>
+      </view>
     </view>
   </view>
 </view>

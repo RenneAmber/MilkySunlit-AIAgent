@@ -1,0 +1,153 @@
+.page {
+  min-height: 100vh;
+  background: #f6fbff;
+  padding: 24rpx;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(42, 61, 120, 0.08);
+}
+
+.list-card {
+  margin-top: 20rpx;
+}
+
+.title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2b3562;
+  margin-bottom: 16rpx;
+}
+
+.form-row {
+  margin-bottom: 14rpx;
+}
+
+.label {
+  display: block;
+  margin-bottom: 6rpx;
+  font-size: 24rpx;
+  color: #5b6693;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  border-radius: 12rpx;
+  border: 1px solid #d7ddf6;
+  background: #f9faff;
+  padding: 16rpx;
+  font-size: 26rpx;
+  color: #2b3562;
+  box-sizing: border-box;
+}
+
+.textarea {
+  min-height: 140rpx;
+}
+
+.primary {
+  margin-top: 14rpx;
+  background: linear-gradient(135deg, #4d8bff 0%, #4f6bff 100%);
+  color: #fff;
+  border-radius: 999rpx;
+}
+
+.form-actions {
+  margin-top: 14rpx;
+  display: flex;
+  gap: 12rpx;
+}
+
+.form-actions .primary {
+  margin-top: 0;
+  flex: 1;
+}
+
+.search-row {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+}
+
+.search-input {
+  flex: 1;
+}
+
+.item {
+  padding: 16rpx;
+  border: 1px solid #e5e9ff;
+  border-radius: 14rpx;
+  background: #fbfcff;
+  margin-top: 14rpx;
+}
+
+.item-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #253162;
+}
+
+.item-line {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #5b6693;
+  word-break: break-all;
+}
+
+.step {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #4a547f;
+}
+
+.item-actions {
+  margin-top: 10rpx;
+  display: flex;
+  gap: 12rpx;
+}
+
+.loading,
+.empty {
+  font-size: 24rpx;
+  color: #7d87af;
+  padding: 12rpx 0;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.header-row .title {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.add-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 14rpx 28rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #4d8bff 0%, #4f6bff 100%);
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  white-space: nowrap;
+}
+
+.search-btn {
+  padding: 14rpx 28rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #4d8bff 0%, #4f6bff 100%);
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 600;
+  white-space: nowrap;
+}

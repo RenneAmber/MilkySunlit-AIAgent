@@ -1,0 +1,268 @@
+.admin-page {
+  min-height: 100vh;
+  padding: 36rpx 24rpx;
+  box-sizing: border-box;
+  background: linear-gradient(170deg, #070d22 0%, #101b45 48%, #1a1c52 100%);
+}
+
+.admin-wrap,
+.admin-card {
+  border-radius: 24rpx;
+  padding: 28rpx;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(185, 198, 255, 0.2);
+  box-shadow: 0 16rpx 42rpx rgba(5, 10, 40, 0.35);
+  backdrop-filter: blur(10rpx);
+  color: #eaf0ff;
+}
+
+.denied {
+  margin-top: 120rpx;
+}
+
+.title {
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.desc {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: rgba(226, 234, 255, 0.86);
+}
+
+.env-tip {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: rgba(196, 214, 255, 0.92);
+  word-break: break-all;
+}
+
+.filter-row {
+  margin-top: 18rpx;
+}
+
+.filter-label {
+  font-size: 22rpx;
+  color: rgba(220, 229, 255, 0.88);
+}
+
+.filter-options {
+  display: flex;
+  gap: 12rpx;
+  flex-wrap: wrap;
+  margin-top: 12rpx;
+}
+
+.filter-chip {
+  padding: 0 22rpx;
+  line-height: 52rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: #dfe7ff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(194, 208, 255, 0.22);
+}
+
+.filter-chip-active {
+  color: #101842;
+  background: linear-gradient(130deg, #c2d0ff 0%, #90a7ff 100%);
+  border-color: transparent;
+}
+
+.btn-row {
+  display: flex;
+  gap: 14rpx;
+  margin-top: 18rpx;
+}
+
+.btn {
+  margin-top: 20rpx;
+  min-width: 170rpx;
+  padding: 0 24rpx;
+  line-height: 62rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #101842;
+  background: linear-gradient(130deg, #c2d0ff 0%, #90a7ff 100%);
+}
+
+.btn-light {
+  background: rgba(255, 255, 255, 0.2);
+  color: #eaf0ff;
+  border: 1px solid rgba(200, 212, 255, 0.35);
+}
+
+.stats-box {
+  margin-top: 22rpx;
+  border-radius: 20rpx;
+  padding: 20rpx;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.stats-label {
+  font-size: 22rpx;
+  color: rgba(230, 236, 255, 0.85);
+}
+
+.stats-item-gap {
+  margin-top: 20rpx;
+}
+
+.stats-value {
+  margin-top: 8rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.stats-value-warn {
+  color: #ffd3a2;
+}
+
+.list-box {
+  margin-top: 22rpx;
+  border-radius: 20rpx;
+  padding: 20rpx;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.list-title {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.empty {
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  color: rgba(225, 232, 255, 0.72);
+}
+
+.diary-card {
+  margin-top: 14rpx;
+  border-radius: 16rpx;
+  padding: 16rpx;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.diary-content {
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.diary-text {
+  font-size: 26rpx;
+  color: #222b55;
+}
+
+.diary-meta {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #6d79aa;
+}
+
+.card-actions {
+  display: flex;
+  gap: 14rpx;
+  margin-top: 16rpx;
+}
+
+.mini-btn {
+  min-width: 140rpx;
+  padding: 0 18rpx;
+  line-height: 54rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: #1b2758;
+  background: rgba(150, 174, 255, 0.22);
+  border: 1px solid rgba(132, 152, 230, 0.45);
+}
+
+.mini-btn-danger {
+  color: #8d2e38;
+  background: rgba(255, 217, 220, 0.92);
+  border-color: rgba(201, 96, 108, 0.35);
+}
+
+.log-card {
+  margin-top: 14rpx;
+  border-radius: 16rpx;
+  padding: 16rpx;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.log-content {
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.log-question {
+  font-size: 25rpx;
+  color: #1d2b63;
+  font-weight: 600;
+}
+
+.log-answer {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #2f3969;
+}
+
+.log-meta {
+  margin-top: 8rpx;
+  font-size: 21rpx;
+  color: #6d79aa;
+  word-break: break-all;
+}
+
+.log-error {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #ca4f58;
+  line-height: 1.5;
+}
+
+.error-card {
+  margin-top: 14rpx;
+  border-radius: 16rpx;
+  padding: 16rpx;
+  background: rgba(255, 239, 239, 0.92);
+}
+
+.error-content {
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.error-title {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #922a35;
+}
+
+.error-text {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: #b44753;
+  word-break: break-all;
+}
+
+.error-hint {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: rgba(236, 213, 216, 0.95);
+}
+
+.load-more {
+  margin-top: 16rpx;
+  line-height: 60rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #dce5ff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(194, 208, 255, 0.22);
+}

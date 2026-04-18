@@ -1,0 +1,62 @@
+<view class="page">
+  <!-- 新增/编辑表单界面 -->
+  <view wx:if="{{showAddForm}}">
+    <view class="card form-card">
+      <view class="title">{{editingId ? '编辑菜谱' : '新增菜谱'}}</view>
+      <view class="form-row">
+        <text class="label">名称</text>
+        <input class="input" value="{{name}}" data-field="name" bindinput="onInput" placeholder="如 番茄炒蛋" />
+      </view>
+      <view class="form-row">
+        <text class="label">所需食材（每行一个）</text>
+        <textarea class="textarea" maxlength="-1" value="{{ingredientsText}}" data-field="ingredientsText" bindinput="onInput" placeholder="番茄&#10;鸡蛋&#10;盐" />
+      </view>
+      <view class="form-row">
+        <text class="label">做法步骤（每行一步）</text>
+        <textarea class="textarea" maxlength="-1" value="{{stepsText}}" data-field="stepsText" bindinput="onInput" placeholder="1. 番茄切块&#10;2. 鸡蛋打散&#10;3. 先炒蛋再炒番茄" />
+      </view>
+      <view class="form-row">
+        <text class="label">链接</text>
+        <input class="input" value="{{link}}" data-field="link" bindinput="onInput" placeholder="https://..." />
+      </view>
+      <view class="form-row">
+        <text class="label">备注</text>
+        <input class="input" value="{{note}}" data-field="note" bindinput="onInput" placeholder="可选" />
+      </view>
+      <view class="form-actions">
+        <button class="primary" loading="{{adding}}" bindtap="addRecipe">{{editingId ? '保存编辑' : '新增菜谱'}}</button>
+        <button bindtap="cancelEdit">{{editingId ? '取消编辑' : '返回列表'}}</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 菜谱列表界面 -->
+  <view wx:else>
+    <view class="card list-card">
+      <view class="header-row">
+        <view class="title">菜谱列表</view>
+        <view class="add-btn" bind:tap="startAddRecipe">＋ 添加菜谱</view>
+      </view>
+      <view class="search-row">
+        <input class="input search-input" value="{{keyword}}" data-field="keyword" bindinput="onInput" placeholder="名称 / 食材" />
+        <view class="search-btn" bind:tap="search">搜索</view>
+      </view>
+
+      <view class="loading" wx:if="{{loading}}">加载中...</view>
+      <view class="empty" wx:if="{{!loading && !list.length}}">暂无菜谱</view>
+
+      <view class="item" wx:for="{{list}}" wx:key="id" wx:for-item="recipe">
+        <view class="item-title">{{recipe.name}}</view>
+        <view class="item-line">食材：{{recipe.ingredientsDisplay || '暂无'}}</view>
+        <view class="item-line">步骤：</view>
+        <view class="step" wx:for="{{recipe.stepsDisplay}}" wx:key="index" wx:for-item="stepText">{{index + 1}}. {{stepText}}</view>
+        <view class="item-line" wx:if="{{recipe.link}}">链接：{{recipe.link}}</view>
+        <view class="item-line" wx:if="{{recipe.note}}">备注：{{recipe.note}}</view>
+        <view class="item-actions">
+          <button size="mini" bindtap="startEditRecipe" data-id="{{recipe.id}}">编辑</button>
+          <button size="mini" type="warn" bindtap="deleteRecipe" data-id="{{recipe.id}}">删除</button>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,73 @@
+<view class="page">
+  <view class="card form-card">
+    <view class="title">新增记账</view>
+    <view class="form-row">
+      <text class="label">转出人</text>
+      <input class="input" value="{{fromName}}" data-field="fromName" bindinput="onInput" />
+    </view>
+    <view class="form-row">
+      <text class="label">收款人</text>
+      <input class="input" value="{{toName}}" data-field="toName" bindinput="onInput" />
+    </view>
+    <view class="form-row">
+      <text class="label">转账金额</text>
+      <input class="input" type="digit" value="{{transferAmount}}" data-field="transferAmount" bindinput="onInput" placeholder="如 3000" />
+    </view>
+    <view class="form-row">
+      <text class="label">购买用途</text>
+      <input class="input" value="{{purchaseItem}}" data-field="purchaseItem" bindinput="onInput" placeholder="如 护肤品" />
+    </view>
+    <view class="form-row">
+      <text class="label">承诺归还日期</text>
+      <picker mode="date" bindchange="onDateChange">
+        <view class="picker">{{promiseDate || '请选择日期'}}</view>
+      </picker>
+    </view>
+    <view class="form-row">
+      <text class="label">承诺归还金额</text>
+      <input class="input" type="digit" value="{{promiseAmount}}" data-field="promiseAmount" bindinput="onInput" placeholder="默认等于转账金额" />
+    </view>
+    <button class="primary" loading="{{adding}}" bindtap="addItem">新增账单</button>
+  </view>
+
+  <view class="card list-card">
+    <view class="title">账单列表</view>
+    <view class="reminder-hint" wx:if="{{!hasReminderSubscription && reminderConfig.bookkeeping.enabled}}">
+      <text class="reminder-hint-icon">🔔</text>
+      <text class="reminder-hint-text">还没有订阅账单提醒，点击账单下的"订阅提醒"可收到微信通知</text>
+    </view>
+    <view class="loading" wx:if="{{loading}}">加载中...</view>
+    <view class="empty" wx:if="{{!loading && !list.length}}">暂无账单</view>
+
+    <view class="item" wx:for="{{list}}" wx:key="id">
+      <view class="item-title">{{item.purchaseItem}}</view>
+      <view class="item-line">{{item.fromName}} → {{item.toName}}，转账 ¥{{item.transferAmount}}</view>
+      <view class="item-line">创建于 {{item.createdAtText}}</view>
+      <view class="item-line">承诺 {{item.promiseDate}} 归还 ¥{{item.promiseAmount}}</view>
+      <view class="item-line">已还 ¥{{item.repaidAmount}}，还欠 ¥{{item.outstandingAmount}} <text wx:if="{{item.overdue}}" class="warn">（已超期）</text></view>
+      <view class="penalty-box" wx:if="{{item.penaltySuggestion || (item.overdue && item.outstandingAmount > 0)}}">
+        <view class="item-line">惩罚状态：
+          <text wx:if="{{item.penaltySuggestion && item.penaltyDecision === 'pending'}}" class="pending">待签署</text>
+          <text wx:elif="{{item.penaltySuggestion && item.penaltyDecision === 'accepted'}}" class="accepted">已同意</text>
+          <text wx:elif="{{item.penaltySuggestion && item.penaltyDecision === 'rejected'}}" class="rejected">已拒绝</text>
+          <text wx:else>未发起</text>
+        </view>
+        <view class="item-line" wx:if="{{item.penaltySuggestion}}">惩罚措施：{{item.penaltySuggestion}}</view>
+        <view class="btn-row" wx:if="{{item.canSuggestPenalty}}">
+          <button size="mini" bindtap="suggestPenalty" data-id="{{item.id}}">增加惩罚措施</button>
+        </view>
+        <view class="btn-row" wx:if="{{item.canDecidePenalty}}">
+          <button size="mini" bindtap="decidePenalty" data-id="{{item.id}}" data-decision="accept">同意</button>
+          <button size="mini" type="warn" bindtap="decidePenalty" data-id="{{item.id}}" data-decision="reject">拒绝</button>
+        </view>
+      </view>
+      <view class="btn-row">
+        <button size="mini" bindtap="subscribeBookkeepingReminder" data-id="{{item.id}}">订阅提醒</button>
+        <button size="mini" bindtap="testBookkeepingReminder" data-id="{{item.id}}">测试发送</button>
+        <button size="mini" bindtap="editPromiseDate" data-id="{{item.id}}">改日期</button>
+        <button size="mini" bindtap="editPromiseAmount" data-id="{{item.id}}">改金额</button>
+        <button wx:if="{{item.isOwner}}" size="mini" type="warn" bindtap="deleteItem" data-id="{{item.id}}">删除</button>
+      </view>
+    </view>
+  </view>
+</view>

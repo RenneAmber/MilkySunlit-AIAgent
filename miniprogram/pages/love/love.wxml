@@ -1,0 +1,142 @@
+<view class="love-page">
+  <view class="sky-vignette"></view>
+  <view class="galaxy-band galaxy-band-a"></view>
+  <view class="galaxy-band galaxy-band-b"></view>
+  <view class="galaxy-flow"></view>
+  <view class="nebula nebula-a"></view>
+  <view class="nebula nebula-b"></view>
+  <view class="stardust-layer"></view>
+  <view class="star-layer">
+    <view
+      wx:for="{{stars}}"
+      wx:key="id"
+      class="star"
+      style="left: {{item.left}}%; top: {{item.top}}%; width: {{item.size}}rpx; height: {{item.size}}rpx; animation-delay: -{{item.delay}}s; animation-duration: {{item.duration}}s; {{item.colorStyle}}"
+    ></view>
+  </view>
+
+  <view class="meteor-layer">
+    <view
+      wx:for="{{meteors}}"
+      wx:key="id"
+      class="meteor"
+      style="left: {{item.left}}%; top: {{item.top}}%; animation-delay: -{{item.delay}}s; animation-duration: {{item.duration}}s; opacity: {{item.opacity}};"
+    >
+      <view class="meteor-track" style="transform: rotate({{item.angle}}deg) scale({{item.scale}});">
+        <view class="meteor-tail" style="width: {{item.tail}}rpx; {{item.tailStyle}}"></view>
+        <view class="meteor-glow" style="{{item.glowStyle}}"></view>
+        <view class="meteor-head" style="{{item.headStyle}}"></view>
+      </view>
+    </view>
+  </view>
+
+  <view class="sparkle-layer">
+    <view
+      wx:for="{{sparkles}}"
+      wx:key="id"
+      class="sparkle"
+      style="left: {{item.left}}%; top: {{item.top}}%; width: {{item.size}}rpx; height: {{item.size}}rpx; animation-delay: -{{item.delay}}s; animation-duration: {{item.duration}}s; opacity: {{item.opacity}};"
+    ></view>
+  </view>
+
+  <view class="calendar-wrap">
+    <view class="calendar-card">
+      <view class="calendar-title">共享日历</view>
+      <view class="calendar-subtitle">孙励天与宋陶颖可互相添加、查看、删除</view>
+      <view class="calendar-owner" wx:if="{{viewerLabel}}">当前身份：{{viewerLabel}}</view>
+
+      <!-- Month Navigation -->
+      <view class="month-navigation">
+        <view class="month-btn" bind:tap="prevMonth">◀</view>
+        <view class="month-label">{{currentMonth}}</view>
+        <view class="month-btn" bind:tap="nextMonth">▶</view>
+      </view>
+
+      <!-- Calendar Grid -->
+      <view class="calendar-header">
+        <view class="week-day">日</view>
+        <view class="week-day">一</view>
+        <view class="week-day">二</view>
+        <view class="week-day">三</view>
+        <view class="week-day">四</view>
+        <view class="week-day">五</view>
+        <view class="week-day">六</view>
+      </view>
+
+      <view class="calendar-grid">
+        <view 
+          wx:for="{{calendarDays}}" 
+          wx:key="dateStr"
+          class="calendar-day {{item.isCurrentMonth ? 'current-month' : 'other-month'}} {{item.isToday ? 'today' : ''}} {{item.hasEvents ? 'has-events' : ''}} {{item.dateStr === selectedDate ? 'selected' : ''}}"
+          bind:tap="onSelectDate"
+          data-date="{{item.dateStr}}"
+        >
+          <view class="day-number">{{item.day}}</view>
+          <view class="event-indicator" wx:if="{{item.hasEvents}}">●</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- Selected Date Details and Add Form -->
+    <view class="details-card">
+      <view class="details-header">
+        <view class="selected-date-display">{{selectedDate}}</view>
+        <view class="event-count">{{calendarLoading ? '加载中' : ('共 ' + calendarCount + ' 条')}}</view>
+      </view>
+
+      <view class="add-form">
+        <view class="form-row">
+          <view class="label">标题</view>
+          <input class="text-input" placeholder="例如：宝宝疫苗、纪念日晚餐" value="{{eventTitle}}" bindinput="onTitleInput" maxlength="60" />
+        </view>
+
+        <view class="form-row form-row-note">
+          <view class="label">备注</view>
+          <textarea class="text-area" placeholder="可写地点、时间、要做的事" value="{{eventNote}}" bindinput="onNoteInput" maxlength="240" />
+        </view>
+
+        <view class="action-row">
+          <view class="action-btn" bind:tap="addCalendarItem">{{adding ? '添加中...' : '添加事项'}}</view>
+        </view>
+      </view>
+
+      <!-- Events List -->
+      <view class="events-list">
+        <view class="empty" wx:if="{{!calendarLoading && calendarList.length === 0}}">这一天还没有共享事项</view>
+        <view class="calendar-item" wx:for="{{calendarList}}" wx:key="_id">
+          <view class="item-top">
+            <view class="item-title">{{item.title || '未命名事项'}}</view>
+            <view class="item-user">{{item.displayUser}}</view>
+          </view>
+          <view class="item-note" wx:if="{{item.note}}">{{item.note}}</view>
+          <view class="item-meta">创建时间：{{item.createdAtText || item.createdAt}}</view>
+          <view class="item-actions">
+            <view class="mini-subscribe" bind:tap="subscribeCalendarReminder" data-id="{{item._id}}">订阅提醒</view>
+            <view class="mini-test" bind:tap="testCalendarReminder" data-id="{{item._id}}">测试发送</view>
+            <view class="mini-delete" bind:tap="deleteCalendarItem" data-id="{{item._id}}">{{deletingId === item._id ? '删除中...' : '删除'}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Anniversaries Section -->
+  <view class="calendar-wrap" wx:if="{{anniversaries.length}}">
+    <view class="calendar-card">
+      <view class="calendar-title">纪念日</view>
+      <view class="calendar-subtitle">每年自动提醒，需要各自订阅</view>
+      <view class="anniversary-item" wx:for="{{anniversaries}}" wx:key="id">
+        <view class="anniversary-main">
+          <view class="anniversary-name">{{item.name}}</view>
+          <view class="anniversary-date">{{item.dateText}}</view>
+        </view>
+        <view class="item-actions">
+          <view class="mini-subscribe" bind:tap="subscribeAnniversaryReminder" data-id="{{item.id}}">订阅提醒</view>
+          <view class="mini-test" bind:tap="testAnniversaryReminder" data-id="{{item.id}}">测试发送</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="back-btn" bind:tap="goBack">返回首页</view>
+</view>

@@ -1,17 +1,14 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/chatGpt41/chatGpt41",
     "pages/chatBot/chatBot",
     "pages/diary/diary",
+    "pages/bookkeeping/bookkeeping",
+    "pages/recipes/recipes",
+    "pages/love/love",
+    "pages/admin/admin",
     "pages/history-diary/history-diary"
   ],
-  "usingComponents": {
-    "custom-map": "/components/toolCard/map/index",
-    "custom-weather": "/components/toolCard/weather/index",
-    "custom-food-list": "/components/toolCard/food-list/index",
-    "custom-business-list": "/components/toolCard/business-list/index"
-  },
   "window": {
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",

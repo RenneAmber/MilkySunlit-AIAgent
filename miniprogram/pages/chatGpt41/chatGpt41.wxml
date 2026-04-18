@@ -1,5 +1,0 @@
-<!--pages/chatGpt41/chatGpt41.wxml-->
-<view>
-  <agent-ui agentConfig="{{agentConfig}}" showBotAvatar="{{showBotAvatar}}" chatMode="{{chatMode}}" modelConfig="{{modelConfig}}" envShareConfig="{{envShareConfig}}">
-  </agent-ui>
-</view>
