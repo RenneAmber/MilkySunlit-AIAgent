@@ -111,8 +111,13 @@
           <view class="item-note" wx:if="{{item.note}}">{{item.note}}</view>
           <view class="item-meta">创建时间：{{item.createdAtText || item.createdAt}}</view>
           <view class="item-actions">
-            <view class="mini-subscribe" bind:tap="subscribeCalendarReminder" data-id="{{item._id}}">订阅提醒</view>
-            <view class="mini-test" bind:tap="testCalendarReminder" data-id="{{item._id}}">测试发送</view>
+            <view wx:if="{{calendarSubscribedMap[item._id]}}" class="subscribed-label">√ 已订阅</view>
+            <view
+              wx:else
+              class="mini-subscribe"
+              bind:tap="subscribeCalendarReminder"
+              data-id="{{item._id}}"
+            >订阅提醒</view>
             <view class="mini-delete" bind:tap="deleteCalendarItem" data-id="{{item._id}}">{{deletingId === item._id ? '删除中...' : '删除'}}</view>
           </view>
         </view>
@@ -125,14 +130,30 @@
     <view class="calendar-card">
       <view class="calendar-title">纪念日</view>
       <view class="calendar-subtitle">每年自动提醒，需要各自订阅</view>
+      <view class="anniversary-toolbar">
+        <view wx:if="{{anniversaryAllSubscribed}}" class="subscribed-label all-subscribed-label">√ 全部已订阅</view>
+        <view
+          wx:else
+          class="mini-subscribe-all"
+          bind:tap="subscribeAllAnniversaryReminders"
+        >一键订阅全部</view>
+      </view>
       <view class="anniversary-item" wx:for="{{anniversaries}}" wx:key="id">
         <view class="anniversary-main">
-          <view class="anniversary-name">{{item.name}}</view>
+          <view class="anniversary-name-wrap">
+            <view class="anniversary-name">{{item.name}}</view>
+            <view wx:if="{{item.anniversaryLabel}}" class="anniversary-tag">{{item.anniversaryLabel}}</view>
+          </view>
           <view class="anniversary-date">{{item.dateText}}</view>
         </view>
         <view class="item-actions">
-          <view class="mini-subscribe" bind:tap="subscribeAnniversaryReminder" data-id="{{item.id}}">订阅提醒</view>
-          <view class="mini-test" bind:tap="testAnniversaryReminder" data-id="{{item.id}}">测试发送</view>
+          <view wx:if="{{anniversarySubscribedMap[item.id]}}" class="subscribed-label">√ 已订阅</view>
+          <view
+            wx:else
+            class="mini-subscribe"
+            bind:tap="subscribeAnniversaryReminder"
+            data-id="{{item.id}}"
+          >订阅提醒</view>
         </view>
       </view>
     </view>

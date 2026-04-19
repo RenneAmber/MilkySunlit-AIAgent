@@ -62,7 +62,7 @@
         </view>
       </view>
       <view class="btn-row">
-        <button size="mini" bindtap="subscribeBookkeepingReminder" data-id="{{item.id}}">订阅提醒</button>
+        <button size="mini" bindtap="subscribeBookkeepingReminder" data-id="{{item.id}}">{{bookkeepingSubscribedMap[item.id] ? '已订阅' : '订阅提醒'}}</button>
         <button size="mini" bindtap="testBookkeepingReminder" data-id="{{item.id}}">测试发送</button>
         <button size="mini" bindtap="editPromiseDate" data-id="{{item.id}}">改日期</button>
         <button size="mini" bindtap="editPromiseAmount" data-id="{{item.id}}">改金额</button>

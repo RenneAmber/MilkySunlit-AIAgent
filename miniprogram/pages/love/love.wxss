@@ -492,6 +492,11 @@
   background: linear-gradient(135deg, rgba(111, 129, 255, 0.9) 0%, rgba(120, 89, 232, 0.9) 100%);
 }
 
+.mini-subscribed {
+  color: #d7ffe4;
+  background: linear-gradient(135deg, rgba(52, 156, 98, 0.9) 0%, rgba(40, 128, 87, 0.9) 100%);
+}
+
 .mini-test {
   min-width: 140rpx;
   text-align: center;
@@ -519,6 +524,39 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.anniversary-toolbar {
+  margin-top: 12rpx;
+  margin-bottom: 12rpx;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mini-subscribe-all {
+  min-width: 200rpx;
+  text-align: center;
+  height: 56rpx;
+  line-height: 56rpx;
+  border-radius: 999rpx;
+  color: #f4f7ff;
+  font-size: 24rpx;
+  background: linear-gradient(135deg, rgba(111, 129, 255, 0.9) 0%, rgba(120, 89, 232, 0.9) 100%);
+}
+
+.subscribed-label {
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 10rpx;
+  color: #79e2a5;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.all-subscribed-label {
+  padding: 0;
+  min-width: 200rpx;
+  text-align: right;
+}
+
 .anniversary-item:last-child {
   border-bottom: none;
 }
@@ -530,10 +568,27 @@
   margin-bottom: 10rpx;
 }
 
+.anniversary-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  min-width: 0;
+}
+
 .anniversary-name {
   font-size: 28rpx;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
+}
+
+.anniversary-tag {
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  color: #ffeab6;
+  font-size: 20rpx;
+  line-height: 1.4;
+  background: rgba(255, 210, 124, 0.14);
+  border: 1px solid rgba(255, 210, 124, 0.24);
 }
 
 .anniversary-date {

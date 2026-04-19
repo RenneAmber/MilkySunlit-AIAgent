@@ -1,4 +1,4 @@
-const cloud = require('wx-server-sdk');
+﻿const cloud = require('wx-server-sdk');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
@@ -6,21 +6,31 @@ const db = cloud.database();
 const _ = db.command;
 
 const ADMIN_OPENIDS = [
-  'o1vza4lDAMQeVaoL2xdW4E_xmJCs'
+  'o1vza4lDAMQeVaoL2xdW4E_xmJCs'  // 孙励天
 ];
 
 const USER_IDENTITY_MAP = {
-  o1vza4lDAMQeVaoL2xdW4E_xmJCs: {
+  'o1vza4lDAMQeVaoL2xdW4E_xmJCs': {
     userLabel: '孙励天',
     personName: '孙励天',
-    identityPrompt: '当前使用这个账号的用户是孙励天。在没有额外说明时，用户说的“我”默认指孙励天本人；涉及关系、喜好、工作、生活、家庭时，优先从孙励天本人的视角理解和回答。',
+    identityPrompt: '当前使用这个账号的用户是孙励天。在没有额外说明时，用户说的"我"默认指孙励天本人；涉及关系、喜好、工作、生活、家庭时，优先从孙励天本人的视角理解和回答。'
   },
-  o1vza4gSIXtoc73DOsiBVNpsgOao: {
+  'o1vza4gSIXtoc73DOsiBVNpsgOao': {
     userLabel: '宋陶颖',
     personName: '宋陶颖',
-    identityPrompt: '当前使用这个账号的用户是宋陶颖。在没有额外说明时，用户说的“我”默认指宋陶颖本人；涉及关系、喜好、工作、生活、家庭时，优先从宋陶颖本人的视角理解和回答。',
+    identityPrompt: '当前使用这个账号的用户是宋陶颖。在没有额外说明时，用户说的"我"默认指宋陶颖本人；涉及关系、喜好、工作、生活、家庭时，优先从宋陶颖本人的视角理解和回答。',
   },
-};
+  'o1vza4qmggBW1NhFzRmfdvDU-J_c': {
+    userLabel: '秦天',
+    personName: '秦天',
+    identityPrompt: '当前使用这个账号的用户是秦天。在没有额外说明时，用户说的"我"默认指秦天本人；涉及关系、喜好、工作、生活、家庭时，优先从秦天本人的视角理解和回答。',
+  },
+  'o1vza4hm5DLFuLz2kPG9ffB5czDg': {
+    userLabel: '山雪',
+    personName: '山雪',
+    identityPrompt: '当前使用这个账号的用户是山雪。在没有额外说明时，用户说的"我"默认指山雪本人；涉及关系、喜好、工作、生活、家庭时，优先从山雪本人的视角理解和回答。',
+  }
+}
 
 const DIARY_SYNC_OPENID_GROUPS = [
   [
@@ -29,9 +39,16 @@ const DIARY_SYNC_OPENID_GROUPS = [
   ],
 ];
 
+const ANNIVERSARY_VISIBLE_OPENIDS = [
+  'o1vza4lDAMQeVaoL2xdW4E_xmJCs', // 孙励天open id
+  'o1vza4gSIXtoc73DOsiBVNpsgOao', // 宋陶颖open id
+];
+
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_CALENDAR_LIMIT = 80;
 const DEFAULT_SHARED_MEMORY_LIMIT = 30;
+const DEFAULT_RAG_RESULT_LIMIT = 8;
+const MAX_RAG_CANDIDATE_LIMIT = 120;
 const SHARED_CALENDAR_COLLECTION = 'shared_calendar';
 const SHARED_CONCEPT_MEMORY_COLLECTION = 'shared_concept_memory';
 const SHARED_BOOKKEEPING_COLLECTION = 'shared_bookkeeping';
@@ -42,19 +59,19 @@ const RELATIONSHIP_ANNIVERSARIES = [
   { id: 'song-birthday', name: '宋陶颖生日', monthDay: '11-25', dateText: '11.25', type: 'birthday', owner: '宋陶颖' },
   { id: 'sun-birthday', name: '孙励天生日', monthDay: '01-18', dateText: '1.18', type: 'birthday', owner: '孙励天' },
   { id: 'xingyue-birthday', name: '孙星玥生日', monthDay: '10-18', dateText: '10.18', type: 'birthday', owner: '孙星玥' },
-  { id: 'together-day', name: '在一起时间', date: '2021-11-21', dateText: '2021.11.21', type: 'milestone' },
-  { id: 'license-day', name: '领证（代替结婚纪念日）', date: '2023-02-18', dateText: '2023.02.18', type: 'milestone' },
+  { id: 'together-day', name: '在一起', date: '2021-11-21', dateText: '2021.11.21', type: 'milestone' },
+  { id: 'license-day', name: '领证纪念日', date: '2023-02-18', dateText: '2023.02.18', type: 'milestone' },
 ];
 
 const REMINDER_TEMPLATE_CONFIG = {
   anniversary: {
     templateId: 'FK8M0CLpzj1xQGUXCAPRqPshILh9hIDYnfOwadiEd5w',
     fields: {
-      reminderPerson: 'name1',
-      date: 'date2',
-      reminderThing: 'thing3',
-      subject: 'phrase5',
-      remark: 'thing9',
+      subject: 'thing1',
+      reminderPerson: 'name2',
+      date: 'date4',
+      remark: 'thing5',
+      reminderThing: 'thing6',
     },
   },
   calendar: {
@@ -89,8 +106,8 @@ const REMINDER_TYPE_OPTIONS = {
     { value: 'calendar_same_day', label: '当天提醒' },
   ],
   bookkeeping: [
-    { value: 'bookkeeping_due', label: '到期提醒' },
-    { value: 'bookkeeping_overdue', label: '超期提醒' },
+    { value: 'bookkeeping_due', label: 'åˆ°æœŸæé†’' },
+    { value: 'bookkeeping_overdue', label: 'è¶…æœŸæé†’' },
   ],
 };
 
@@ -188,6 +205,265 @@ function normalizeSharedMemoryContent(content) {
   return text.slice(0, 300);
 }
 
+function normalizeRagLimit(limit) {
+  return Math.max(1, Math.min(Number(limit) || DEFAULT_RAG_RESULT_LIMIT, 20));
+}
+
+function normalizeRagQuery(query) {
+  return String(query || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
+function normalizeMemoryVisibility(value = '') {
+  const level = String(value || '').trim().toLowerCase();
+  if (level === 'admin') return 'admin';
+  if (level === 'couple') return 'couple';
+  return 'public';
+}
+
+function canViewerAccessMemoryItem(item = {}, viewerOpenid = '') {
+  const viewer = String(viewerOpenid || '').trim();
+  const ownerOpenid = String(item.ownerOpenid || item._openid || item.creatorOpenid || '').trim();
+  const isViewerAdmin = isAdmin(viewer);
+  const isOwner = viewer && ownerOpenid && viewer === ownerOpenid;
+  const level = normalizeMemoryVisibility(item.privacyLevel || item.level || item.visibility);
+
+  if (level === 'public') {
+    return true;
+  }
+  if (level === 'admin') {
+    return isViewerAdmin;
+  }
+  if (isViewerAdmin || isOwner) {
+    return true;
+  }
+  return COUPLE_OPENIDS.includes(viewer) && COUPLE_OPENIDS.includes(ownerOpenid);
+}
+
+function buildRagTokens(text = '') {
+  const normalized = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const stopWords = new Set([
+    '什么', '怎么', '为什么', '请问', '一下', '一个', '这个', '那个', '以及', '还有', '目前', '现在',
+    '是谁', '哪些', '哪个', '你们', '我们', '他们', '她们', '关于', '告诉', '知道', '一下子',
+  ]);
+  const tokens = [];
+  const asciiWords = normalized.match(/[a-z0-9_]+/g) || [];
+  asciiWords.forEach((word) => {
+    if (word && !stopWords.has(word)) {
+      tokens.push(word);
+    }
+  });
+
+  const zhParts = normalized.match(/[\u4e00-\u9fff]+/g) || [];
+  zhParts.forEach((part) => {
+    if (!part) {
+      return;
+    }
+    if (!stopWords.has(part)) {
+      tokens.push(part);
+    }
+    if (part.length === 1) {
+      tokens.push(part);
+      return;
+    }
+    for (let i = 0; i < part.length - 1; i += 1) {
+      const gram = part.slice(i, i + 2);
+      if (gram && !stopWords.has(gram)) {
+        tokens.push(gram);
+      }
+    }
+  });
+
+  return Array.from(new Set(tokens));
+}
+
+function toTimeMs(value) {
+  const ts = new Date(value || '').getTime();
+  return Number.isNaN(ts) ? 0 : ts;
+}
+
+function scoreRagCandidate(queryText = '', queryTokens = [], candidate = {}) {
+  const content = String(candidate.content || '').trim();
+  if (!content) {
+    return 0;
+  }
+
+  const candidateTokens = buildRagTokens(`${candidate.title || ''} ${content} ${candidate.userLabel || ''}`);
+  if (!candidateTokens.length || !queryTokens.length) {
+    return 0;
+  }
+
+  const querySet = new Set(queryTokens);
+  const overlap = candidateTokens.filter((token) => querySet.has(token)).length;
+  if (!overlap) {
+    return 0;
+  }
+
+  const coverage = overlap / Math.max(1, querySet.size);
+  const containsWholeQuery = queryText && content.includes(queryText) ? 1 : 0;
+  const createdAtMs = toTimeMs(candidate.createdAt);
+  const ageDays = createdAtMs ? Math.max(0, (Date.now() - createdAtMs) / (24 * 60 * 60 * 1000)) : 365;
+  const recencyBonus = Math.max(0, 1 - ageDays / 90);
+  const importantBonus = candidate.important ? 0.3 : 0;
+
+  return overlap * 2 + coverage * 2 + containsWholeQuery * 1.5 + recencyBonus + importantBonus;
+}
+
+async function retrieveRagContext(openid, { query, limit } = {}) {
+  const normalizedQuery = normalizeRagQuery(query);
+  const normalizedLimit = normalizeRagLimit(limit);
+  const syncOpenids = getSyncedDiaryOpenids(openid);
+
+  if (!normalizedQuery || !syncOpenids.length) {
+    return {
+      list: [],
+      total: 0,
+      limit: normalizedLimit,
+      query: normalizedQuery,
+      error: null,
+    };
+  }
+
+  try {
+    const [sharedConceptRes, chatMemoryRes, diaryRes] = await Promise.all([
+      db.collection(SHARED_CONCEPT_MEMORY_COLLECTION)
+        .where({ ownerOpenid: _.in(syncOpenids) })
+        .orderBy('createdAt', 'desc')
+        .limit(MAX_RAG_CANDIDATE_LIMIT)
+        .get(),
+      db.collection('chat_memory')
+        .where({ enabled: true })
+        .orderBy('order', 'asc')
+        .limit(MAX_RAG_CANDIDATE_LIMIT)
+        .get(),
+      db.collection('diaryList')
+        .where({ _openid: _.in(syncOpenids) })
+        .orderBy('createdAt', 'desc')
+        .limit(MAX_RAG_CANDIDATE_LIMIT)
+        .get(),
+    ]);
+
+    const queryTokens = buildRagTokens(normalizedQuery);
+    const candidates = [];
+
+    (sharedConceptRes.data || []).forEach((item) => {
+      const content = String(item && item.content ? item.content : '').trim();
+      if (!content) {
+        return;
+      }
+      const ownerOpenid = String(item.ownerOpenid || item._openid || '').trim();
+      const identity = getUserIdentity(ownerOpenid);
+      candidates.push({
+        source: 'sharedConcept',
+        id: String(item._id || '').trim(),
+        content,
+        createdAt: item.createdAt || item._createTime || '',
+        ownerOpenid,
+        userLabel: identity.userLabel || '',
+        important: false,
+      });
+    });
+
+    (chatMemoryRes.data || []).forEach((item) => {
+      if (!canViewerAccessMemoryItem(item, openid)) {
+        return;
+      }
+      const title = String(item && item.title ? item.title : '').trim();
+      const content = String(item && item.content ? item.content : '').trim();
+      const mergedContent = [title, content].filter(Boolean).join('：').trim();
+      if (!mergedContent) {
+        return;
+      }
+      const ownerOpenid = String(item.ownerOpenid || item._openid || item.creatorOpenid || '').trim();
+      const identity = getUserIdentity(ownerOpenid);
+      candidates.push({
+        source: 'chatMemory',
+        id: String(item._id || '').trim(),
+        content: mergedContent,
+        title,
+        createdAt: item.updatedAt || item.createdAt || item._createTime || '',
+        ownerOpenid,
+        userLabel: identity.userLabel || '',
+        important: !!item.important,
+      });
+    });
+
+    (diaryRes.data || []).forEach((item) => {
+      const text = String(item && item.text ? item.text : '').trim();
+      if (!text) {
+        return;
+      }
+      const ownerOpenid = String(item._openid || item.ownerOpenid || '').trim();
+      const identity = getUserIdentity(ownerOpenid);
+      const dateText = String(item.date || '').trim();
+      const diaryContent = dateText ? `${dateText}：${text}` : text;
+      candidates.push({
+        source: 'diary',
+        id: String(item._id || '').trim(),
+        content: diaryContent,
+        createdAt: item.createdAt || item._createTime || '',
+        ownerOpenid,
+        userLabel: identity.userLabel || '',
+        important: !!item.important,
+      });
+    });
+
+    const ranked = candidates
+      .map((candidate) => ({
+        ...candidate,
+        score: scoreRagCandidate(normalizedQuery, queryTokens, candidate),
+      }))
+      .filter((candidate) => candidate.score > 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        return toTimeMs(b.createdAt) - toTimeMs(a.createdAt);
+      });
+
+    const deduped = [];
+    const seen = new Set();
+    ranked.forEach((item) => {
+      if (deduped.length >= normalizedLimit) {
+        return;
+      }
+      const key = String(item.content || '').trim();
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      deduped.push({
+        source: item.source,
+        id: item.id,
+        userLabel: item.userLabel,
+        content: item.content,
+        createdAt: item.createdAt,
+        score: Number(item.score.toFixed(3)),
+      });
+    });
+
+    return {
+      list: deduped,
+      total: deduped.length,
+      limit: normalizedLimit,
+      query: normalizedQuery,
+      error: null,
+    };
+  } catch (error) {
+    console.error('retrieveRagContext error:', error && error.message ? error.message : error);
+    return {
+      list: [],
+      total: 0,
+      limit: normalizedLimit,
+      query: normalizedQuery,
+      error: error && error.message ? error.message : 'Retrieve RAG context failed',
+    };
+  }
+}
+
 function getTodayDateText() {
   const today = new Date();
   const year = today.getFullYear();
@@ -210,6 +486,57 @@ function shiftDateText(dateText, dayOffset = 0) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function getNextAnniversaryDate(sourceItem = {}, referenceDate = '') {
+  const todayText = normalizeCalendarDate(referenceDate) || getTodayDateText();
+  const rawMonthDay = sourceItem.monthDay || String(sourceItem.date || '').slice(5) || '';
+  if (!rawMonthDay || rawMonthDay.length < 5) {
+    return '';
+  }
+  const yearNum = parseInt(todayText.slice(0, 4), 10);
+  const thisYearDate = `${yearNum}-${rawMonthDay}`;
+  return thisYearDate >= todayText ? thisYearDate : `${yearNum + 1}-${rawMonthDay}`;
+}
+
+function getAnniversaryYears(sourceItem = {}, occurrenceDate = '') {
+  const baseDate = normalizeCalendarDate(sourceItem.date);
+  const nextDate = normalizeCalendarDate(occurrenceDate);
+  if (!baseDate || !nextDate) {
+    return 0;
+  }
+  return Math.max(0, parseInt(nextDate.slice(0, 4), 10) - parseInt(baseDate.slice(0, 4), 10));
+}
+
+function getReminderFieldMaxLen(fieldKey = '') {
+  const key = String(fieldKey || '').trim().toLowerCase();
+  if (key.startsWith('phrase')) {
+    return 5;
+  }
+  if (key.startsWith('name')) {
+    return 10;
+  }
+  return 20;
+}
+
+function buildAnniversaryTemplateValues(sourceItem = {}, reminderType = '') {
+  const occurrenceDate = getNextAnniversaryDate(sourceItem);
+  const years = getAnniversaryYears(sourceItem, occurrenceDate);
+  const isBirthday = String(sourceItem.type || '').trim() === 'birthday';
+  const isDayBefore = String(reminderType || '').trim() === 'anniversary_day_before';
+  const subjectValue = isBirthday ? 'ç”Ÿæ—¥æé†’' : (String(sourceItem.name || '').includes('é¢†è¯') ? 'ç»“å©šçºªå¿µæ—¥' : 'çºªå¿µæ—¥æé†’');
+  const reminderThingValue = isBirthday
+    ? sanitizeTemplateText(sourceItem.name || 'ç”Ÿæ—¥æé†’', 20)
+    : sanitizeTemplateText(`${sourceItem.name || 'çºªå¿µæ—¥'}${years > 0 ? `${years}å‘¨å¹´` : ''}`, 20);
+  const remarkValue = isBirthday
+    ? sanitizeTemplateText(isDayBefore ? 'æ˜Žå¤©è®°å¾—é€ä¸Šç¥ç¦å“¦' : 'ä»Šå¤©è®°å¾—åº†ç¥ä¸€ä¸‹å“¦', 20)
+    : sanitizeTemplateText(isDayBefore ? 'æ˜Žå¤©å°±æ˜¯çºªå¿µæ—¥å•¦' : 'ä»Šå¤©æ˜¯é‡è¦çºªå¿µæ—¥å“¦', 20);
+  return {
+    dateValue: occurrenceDate || getTodayDateText(),
+    subjectValue: sanitizeTemplateText(subjectValue, 20) || 'çºªå¿µæ—¥æé†’',
+    reminderThingValue: reminderThingValue || 'çºªå¿µæ—¥æé†’',
+    remarkValue: remarkValue || 'çºªå¿µæ—¥æé†’',
+  };
 }
 
 function normalizeReminderType(sourceType = '', reminderType = '') {
@@ -236,27 +563,35 @@ function isReminderTemplateEnabled(sourceType = '') {
   return !!(config && String(config.templateId || '').trim());
 }
 
-function pickReminderSubscribeConfig() {
+function canViewAnniversaries(openid = '') {
+  return ANNIVERSARY_VISIBLE_OPENIDS.includes(String(openid || '').trim());
+}
+
+function pickAnniversariesForOpenid(openid = '') {
+  return canViewAnniversaries(openid) ? RELATIONSHIP_ANNIVERSARIES : [];
+}
+
+function pickReminderSubscribeConfig(openid = '') {
   return {
     anniversary: {
       enabled: isReminderTemplateEnabled('anniversary'),
       templateId: String((REMINDER_TEMPLATE_CONFIG.anniversary && REMINDER_TEMPLATE_CONFIG.anniversary.templateId) || '').trim(),
       options: REMINDER_TYPE_OPTIONS.anniversary,
-      hint: '每个接收提醒的人都需要在自己的账号里单独订阅一次。',
+      hint: 'æ¯ä¸ªæŽ¥æ”¶æé†’çš„äººéƒ½éœ€è¦åœ¨è‡ªå·±çš„è´¦å·é‡Œå•ç‹¬è®¢é˜…ä¸€æ¬¡ã€‚',
     },
     calendar: {
       enabled: isReminderTemplateEnabled('calendar'),
       templateId: String((REMINDER_TEMPLATE_CONFIG.calendar && REMINDER_TEMPLATE_CONFIG.calendar.templateId) || '').trim(),
       options: REMINDER_TYPE_OPTIONS.calendar,
-      hint: '每个接收提醒的人都需要在自己的账号里单独订阅一次。',
+      hint: 'æ¯ä¸ªæŽ¥æ”¶æé†’çš„äººéƒ½éœ€è¦åœ¨è‡ªå·±çš„è´¦å·é‡Œå•ç‹¬è®¢é˜…ä¸€æ¬¡ã€‚',
     },
     bookkeeping: {
       enabled: isReminderTemplateEnabled('bookkeeping'),
       templateId: String((REMINDER_TEMPLATE_CONFIG.bookkeeping && REMINDER_TEMPLATE_CONFIG.bookkeeping.templateId) || '').trim(),
       options: REMINDER_TYPE_OPTIONS.bookkeeping,
-      hint: '借款人和付款人如果都想收到提醒，需要分别在各自账号里订阅。',
+      hint: 'å€Ÿæ¬¾äººå’Œä»˜æ¬¾äººå¦‚æžœéƒ½æƒ³æ”¶åˆ°æé†’ï¼Œéœ€è¦åˆ†åˆ«åœ¨å„è‡ªè´¦å·é‡Œè®¢é˜…ã€‚',
     },
-    anniversaries: RELATIONSHIP_ANNIVERSARIES,
+    anniversaries: pickAnniversariesForOpenid(openid),
   };
 }
 
@@ -353,7 +688,16 @@ function isReminderStillApplicable(sourceType = '', reminderType = '', sourceIte
 }
 
 function clipReminderThing(value, maxLen = 20) {
-  return normalizeShortText(value, maxLen) || '提醒';
+  return normalizeShortText(value, maxLen) || 'æé†’';
+}
+
+function sanitizeTemplateText(value, maxLen = 20) {
+  const text = String(value || '')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/[<>]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.slice(0, maxLen);
 }
 
 function buildReminderSubscribeMessage(sourceType = '', reminderType = '', sourceItem = {}, subscription = {}) {
@@ -367,50 +711,53 @@ function buildReminderSubscribeMessage(sourceType = '', reminderType = '', sourc
 
   const triggerDate = String(subscription.triggerDate || buildReminderTriggerDate(normalizedSourceType, normalizedReminderType, sourceItem) || '').trim();
   const fieldMap = templateConfig.fields || {};
-  const reminderLabel = getReminderTypeLabel(normalizedSourceType, normalizedReminderType);
-  const recipientName = String(subscription.recipientName || '').trim() || '你';
+  const reminderLabel = sanitizeTemplateText(getReminderTypeLabel(normalizedSourceType, normalizedReminderType), 20);
+  const recipientName = String(subscription.recipientName || '').trim() || 'ä½ ';
 
-  let reminderThingValue = reminderLabel || '提醒事项';
-  let subjectValue = '日程提醒';
-  let remarkValue = reminderLabel || '请及时处理';
+  let dateValue = triggerDate || getTodayDateText();
+  let reminderThingValue = reminderLabel || 'æé†’äº‹é¡¹';
+  let subjectValue = 'æ—¥ç¨‹';
+  let remarkValue = reminderLabel || 'è¯·åŠæ—¶å¤„ç†';
   let page = 'pages/index/index';
 
   if (normalizedSourceType === 'anniversary') {
-    reminderThingValue = clipReminderThing(sourceItem.name || '纪念日', 20);
-    subjectValue = clipReminderThing(sourceItem.name || '纪念日提醒', 5);
-    remarkValue = clipReminderThing(sourceItem.dateText || reminderLabel || '记得庆祝', 20);
+    const anniversaryValues = buildAnniversaryTemplateValues(sourceItem, normalizedReminderType);
+    dateValue = anniversaryValues.dateValue;
+    reminderThingValue = anniversaryValues.reminderThingValue;
+    subjectValue = anniversaryValues.subjectValue;
+    remarkValue = anniversaryValues.remarkValue;
     page = 'pages/love/love';
   } else if (normalizedSourceType === 'calendar') {
-    reminderThingValue = clipReminderThing(sourceItem.title || sourceItem.note || '共享日程', 20);
-    subjectValue = '日程提醒';
-    remarkValue = clipReminderThing(sourceItem.note || reminderLabel || '请查看事项详情', 20);
-    page = `pages/love/love?date=${encodeURIComponent(String(sourceItem.date || '').trim())}`;
+    reminderThingValue = sanitizeTemplateText(sourceItem.title || sourceItem.note || 'å…±äº«æ—¥ç¨‹', 20) || 'å…±äº«æ—¥ç¨‹';
+    subjectValue = 'æ—¥ç¨‹';
+    remarkValue = sanitizeTemplateText(sourceItem.note || reminderLabel || 'è¯·æŸ¥çœ‹äº‹é¡¹è¯¦æƒ…', 20) || 'æ—¥ç¨‹æé†’';
+    page = 'pages/love/love';
   } else if (normalizedSourceType === 'bookkeeping') {
     const outstandingAmount = Math.max(
       0,
       Math.round((normalizeMoney(sourceItem.promiseAmount || sourceItem.transferAmount) - normalizeMoney(sourceItem.repaidAmount)) * 100) / 100
     );
-    reminderThingValue = clipReminderThing(sourceItem.purchaseItem || '共享记账', 20);
-    subjectValue = '账单提醒';
-    remarkValue = clipReminderThing(`承诺归还${sourceItem.promiseDate || '?'}，还欠¥${outstandingAmount}`, 20);
+    reminderThingValue = sanitizeTemplateText(sourceItem.purchaseItem || 'å…±äº«è®°è´¦', 20) || 'å…±äº«è®°è´¦';
+    subjectValue = 'è´¦å•';
+    remarkValue = sanitizeTemplateText(`åˆ°æœŸ${sourceItem.promiseDate || '?'} æ¬ ${outstandingAmount}`, 20) || 'è´¦å•æé†’';
     page = 'pages/bookkeeping/bookkeeping';
   }
 
   const data = {};
   if (fieldMap.reminderPerson) {
-    data[fieldMap.reminderPerson] = { value: clipReminderThing(recipientName, 10) };
+    data[fieldMap.reminderPerson] = { value: sanitizeTemplateText(recipientName, getReminderFieldMaxLen(fieldMap.reminderPerson)) || 'ä½ ' };
   }
   if (fieldMap.date) {
-    data[fieldMap.date] = { value: triggerDate || getTodayDateText() };
+    data[fieldMap.date] = { value: dateValue || getTodayDateText() };
   }
   if (fieldMap.reminderThing) {
-    data[fieldMap.reminderThing] = { value: reminderThingValue };
+    data[fieldMap.reminderThing] = { value: sanitizeTemplateText(reminderThingValue, getReminderFieldMaxLen(fieldMap.reminderThing)) || 'æé†’äº‹é¡¹' };
   }
   if (fieldMap.subject) {
-    data[fieldMap.subject] = { value: subjectValue };
+    data[fieldMap.subject] = { value: sanitizeTemplateText(subjectValue, getReminderFieldMaxLen(fieldMap.subject)) || 'æé†’' };
   }
   if (fieldMap.remark) {
-    data[fieldMap.remark] = { value: remarkValue };
+    data[fieldMap.remark] = { value: sanitizeTemplateText(remarkValue, getReminderFieldMaxLen(fieldMap.remark)) || 'è¯·åŠæ—¶å¤„ç†' };
   }
 
   return {
@@ -446,7 +793,7 @@ function normalizeStringArray(value, maxLen = 20, itemLen = 120) {
     return [];
   }
   return text
-    .split(/[,，;；、\n]/)
+    .split(/[,ï¼Œ;ï¼›ã€\n]/)
     .map((item) => normalizeShortText(item, itemLen))
     .filter(Boolean)
     .slice(0, maxLen);
@@ -502,7 +849,7 @@ function pickBookkeepingFields(item = {}, viewerOpenid = '') {
 }
 
 function buildBookkeepingReminderPayload(item = {}) {
-  const purchaseItem = normalizeShortText(item.purchaseItem, 80) || '账单';
+  const purchaseItem = normalizeShortText(item.purchaseItem, 80) || 'è´¦å•';
   const promiseDate = normalizeCalendarDate(item.promiseDate);
   const outstandingAmount = Math.max(
     0,
@@ -513,8 +860,8 @@ function buildBookkeepingReminderPayload(item = {}) {
   }
   return {
     date: promiseDate,
-    title: '记账到期提醒',
-    note: `${purchaseItem} 到期需归还 ¥${outstandingAmount}`,
+    title: 'è®°è´¦åˆ°æœŸæé†’',
+    note: `${purchaseItem} åˆ°æœŸéœ€å½’è¿˜ Â¥${outstandingAmount}`,
   };
 }
 
@@ -638,9 +985,9 @@ async function getReminderSourceItem(sourceType = '', sourceId = '') {
 }
 
 function canAccessReminderSource(openid, sourceItem = {}) {
-  // Anniversaries are shared constants — any known user can subscribe
+  // Anniversaries are restricted to whitelist users.
   if (sourceItem._id && RELATIONSHIP_ANNIVERSARIES.some((a) => a.id === sourceItem._id)) {
-    return !!USER_IDENTITY_MAP[String(openid || '')];
+    return canViewAnniversaries(openid);
   }
   const openids = getSyncedDiaryOpenids(openid);
   if (!openids.length) {
@@ -654,7 +1001,7 @@ function buildReminderSnapshot(sourceType = '', sourceItem = {}) {
   const normalizedSourceType = String(sourceType || '').trim().toLowerCase();
   if (normalizedSourceType === 'anniversary') {
     return {
-      name: normalizeShortText(sourceItem.name || '纪念日', 80),
+      name: normalizeShortText(sourceItem.name || 'çºªå¿µæ—¥', 80),
       dateText: normalizeShortText(sourceItem.dateText || '', 40),
       type: normalizeShortText(sourceItem.type || '', 20),
     };
@@ -662,14 +1009,14 @@ function buildReminderSnapshot(sourceType = '', sourceItem = {}) {
   if (normalizedSourceType === 'calendar') {
     return {
       date: normalizeCalendarDate(sourceItem.date),
-      title: normalizeShortText(sourceItem.title || '共享日历', 80),
+      title: normalizeShortText(sourceItem.title || 'å…±äº«æ—¥åŽ†', 80),
       note: normalizeShortText(sourceItem.note || '', 120),
     };
   }
   if (normalizedSourceType === 'bookkeeping') {
     return {
       promiseDate: normalizeCalendarDate(sourceItem.promiseDate),
-      purchaseItem: normalizeShortText(sourceItem.purchaseItem || '账单', 80),
+      purchaseItem: normalizeShortText(sourceItem.purchaseItem || 'è´¦å•', 80),
       fromName: normalizeShortText(sourceItem.fromName || '', 32),
       toName: normalizeShortText(sourceItem.toName || '', 32),
       outstandingAmount: Math.max(
@@ -760,6 +1107,7 @@ async function testSendReminderNotification(openid, { sourceType, sourceId, remi
   const normalizedSourceType = String(sourceType || '').trim().toLowerCase();
   const normalizedReminderType = normalizeReminderType(normalizedSourceType, reminderType);
   const docId = String(sourceId || '').trim();
+  let sourceItem = null;
   if (!normalizedSourceType || !normalizedReminderType || !docId) {
     return { success: false, error: 'sourceType/sourceId/reminderType is required' };
   }
@@ -768,7 +1116,7 @@ async function testSendReminderNotification(openid, { sourceType, sourceId, remi
   }
 
   try {
-    const sourceItem = await getReminderSourceItem(normalizedSourceType, docId);
+    sourceItem = await getReminderSourceItem(normalizedSourceType, docId);
     if (!sourceItem) {
       return { success: false, error: 'Source item not found' };
     }
@@ -790,11 +1138,26 @@ async function testSendReminderNotification(openid, { sourceType, sourceId, remi
       error: null,
       recipientOpenid: openid,
       recipientName: String((getUserIdentity(openid).personName || '')).trim(),
+      templatePayload,
     };
   } catch (error) {
     return {
       success: false,
       error: error && error.message ? error.message : 'Test send reminder failed',
+      debug: {
+        errCode: error && error.errCode !== undefined ? error.errCode : null,
+        errMsg: error && error.errMsg ? error.errMsg : '',
+        sourceType: normalizedSourceType,
+        sourceId: docId,
+        reminderType: normalizedReminderType,
+        templateId: String((getReminderTemplateConfig(normalizedSourceType) || {}).templateId || '').trim(),
+        templatePayload: buildReminderSubscribeMessage(normalizedSourceType, normalizedReminderType, sourceItem || {}, {
+          recipientOpenid: openid,
+          ownerOpenid: openid,
+          recipientName: String((getUserIdentity(openid).personName || '')).trim(),
+          triggerDate: getTodayDateText(),
+        }),
+      },
     };
   }
 }
@@ -2087,7 +2450,7 @@ exports.main = async (event = {}, context) => {
       isAdmin: isAdmin(openid),
       isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
       envId,
-      anniversaries: RELATIONSHIP_ANNIVERSARIES,
+      anniversaries: pickAnniversariesForOpenid(openid),
       ...getUserIdentity(openid),
     };
   }
@@ -2096,19 +2459,37 @@ exports.main = async (event = {}, context) => {
     return {
       isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
       envId,
-      anniversaries: RELATIONSHIP_ANNIVERSARIES,
+      anniversaries: pickAnniversariesForOpenid(openid),
     };
   }
 
   if (action === 'listMyReminderSubscriptions') {
     try {
       const filterSourceType = String(event.sourceType || '').trim().toLowerCase();
-      const query = { ownerOpenid: openid, status: 'active' };
+      const query = {
+        status: _.in(['active', 'sent', 'failed']),
+      };
       if (filterSourceType) {
         query.sourceType = filterSourceType;
       }
-      const res = await db.collection(SHARED_REMINDER_SUBSCRIPTION_COLLECTION).where(query).limit(50).get();
-      const subs = res.data || [];
+
+      const [ownerRes, recipientRes] = await Promise.all([
+        db.collection(SHARED_REMINDER_SUBSCRIPTION_COLLECTION).where({ ...query, ownerOpenid: openid }).limit(100).get(),
+        db.collection(SHARED_REMINDER_SUBSCRIPTION_COLLECTION).where({ ...query, recipientOpenid: openid }).limit(100).get(),
+      ]);
+
+      const merged = [...(ownerRes.data || []), ...(recipientRes.data || [])];
+      const subs = [];
+      const seen = new Set();
+      for (const item of merged) {
+        const id = String((item && item._id) || '').trim();
+        if (!id || seen.has(id)) {
+          continue;
+        }
+        seen.add(id);
+        subs.push(item);
+      }
+
       return {
         isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
         envId,
@@ -2131,7 +2512,7 @@ exports.main = async (event = {}, context) => {
     return {
       isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
       envId,
-      reminderConfig: pickReminderSubscribeConfig(),
+      reminderConfig: pickReminderSubscribeConfig(openid),
     };
   }
 
@@ -2271,6 +2652,22 @@ exports.main = async (event = {}, context) => {
       memoryCount: result.total,
       memoryLimit: result.limit,
       syncOpenids: result.openids,
+      error: result.error,
+    };
+  }
+
+  if (action === 'retrieveRagContext') {
+    const result = await retrieveRagContext(openid, {
+      query: event.query,
+      limit: event.limit,
+    });
+    return {
+      isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
+      envId,
+      ragList: result.list,
+      ragCount: result.total,
+      ragLimit: result.limit,
+      query: result.query,
       error: result.error,
     };
   }
@@ -2525,3 +2922,6 @@ exports.main = async (event = {}, context) => {
     isAdmin: true,
   };
 };
+
+
+

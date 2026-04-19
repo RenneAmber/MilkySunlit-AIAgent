@@ -68,7 +68,7 @@ const STATIC_LOCAL_FACTS = {
       relationToPartner: "宋陶颖的老公",
       affectionSummary: "很喜欢宋陶颖",
       favoriteAppearance: "她美丽的外表和白嫩的肌肤",
-      favoriteBodyPart: "脚",
+      favoriteBodyPart: "眼睛，嘴巴，脚",
       affinityDetails: ["喜欢她聪明能干", "喜欢她深深爱着自己", "喜欢她美丽的外表和白嫩的肌肤", "最喜欢她的脚"],
     },
     songTaoying: {
@@ -112,6 +112,29 @@ const STATIC_LOCAL_FACTS = {
       socialSummary: "对孙励天的人生发展、八卦历史和现状都很了解",
       relationshipStatus: "目前单身，没有女朋友；一直想找女生，但经常做舔狗，也会对有对象的女生主动示好",
     },
+    shanXue: {
+      name: "山雪",
+      aliases: ["山雪"],
+      birthday: "1996-01-04",
+      gender: "女",
+      education: "华东理工大学本科",
+      workplace: "默沙东",
+      appearanceSummary: "长相清秀甜美",
+      selfAppearanceView: "自认为颜值最高",
+      personalitySummary: "有点刺头怪脑",
+      groupSummary: "山雪口中的‘群’指山雪、王晓莉、秦天和孙励天四人组成的高中同学群体",
+      relationSummary: "孙励天的高中同学，曹杨二中11班，四人互相认识（孙励天、秦天、王晓莉、山雪）",
+      highschool: "曹杨二中11班",
+    },
+    wangXiaoli: {
+      name: "王晓莉",
+      aliases: ["王晓莉"],
+      birthday: "1996-03-15",
+      gender: "女",
+      education: "交通大学本科",
+      relationSummary: "孙励天的高中同学，曹杨二中11班，与孙励天是校友，四人互相认识（孙励天、秦天、王晓莉、山雪）",
+      highschool: "曹杨二中11班",
+    },
   },
 };
 
@@ -123,16 +146,26 @@ const DEFAULT_MEMORY_ITEMS = [
   },
   {
     title: "孙励天信息",
-    content: "孙励天1996.1.18出生，在悉尼微软工作，程序员。",
+    content: "孙励天1996.1.18出生，在悉尼微软工作，程序员。研究生俄亥俄州立大学，本科上海交通大学，高中曹杨二中",
   },
   {
     title: "宋陶颖信息",
-    content: "宋陶颖1998.11.25出生，在上海马陆派出所工作，警察。",
+    content: "宋陶颖1998.11.25出生，在上海马陆派出所工作，警察。本科中国人民公安大学，优秀毕业生。高中延安中学。",
   },
   {
     title: "秦天信息",
     content:
       "秦天1996.5.19出生，美国理海大学数学博士（2026年毕业），目前在华尔街工作；是孙励天的好兄弟和高中同学，2019年赴美读博后至今未归。爱好是打羽毛球和健身，以前偏胖现在一身腱子肉。",
+  },
+  {
+    title: "山雪信息",
+    content:
+      "山雪1996.1.4出生，女，华东理工大学本科，现在默沙东工作。是孙励天的高中同学，曹杨二中11班。长相清秀甜美，自认为颜值最高，有点刺头怪脑。与孙励天、秦天、王晓莉互相认识。",
+  },
+  {
+    title: "王晓莉信息",
+    content:
+      "王晓莉1996.3.15出生，女，交通大学本科（与孙励天同校）。是孙励天的高中同学，曹杨二中11班。与孙励天、秦天、山雪互相认识。",
   },
 ];
 
@@ -166,6 +199,8 @@ function buildStructuredLocalFactsPrompt(facts = {}, userIdentity = {}, adminOpe
   const songTaoying = people.songTaoying || {};
   const sunXingyue = people.sunXingyue || {};
   const qinTian = people.qinTian || {};
+  const shanXue = people.shanXue || {};
+  const wangXiaoli = people.wangXiaoli || {};
   const sunLitianAge = calculateAge(sunLitian.birthday);
   const songTaoyingAge = calculateAge(songTaoying.birthday);
   const qinTianAge = calculateAge(qinTian.birthday);
@@ -208,6 +243,17 @@ function buildStructuredLocalFactsPrompt(facts = {}, userIdentity = {}, adminOpe
     qinTianGames ? `${qinTian.name}和孙励天一起玩过：${qinTianGames}。` : "",
     qinTian.socialSummary ? `${qinTian.name}补充信息：${qinTian.socialSummary}。` : "",
     qinTian.relationshipStatus ? `${qinTian.name}感情状态：${qinTian.relationshipStatus}。` : "",
+    shanXue.name
+      ? `${shanXue.name}：生日${shanXue.birthday}，${shanXue.gender}，${shanXue.education || ""}，在${shanXue.workplace || "未知"}工作。`
+      : "",
+    shanXue.appearanceSummary ? `${shanXue.name}外貌：${shanXue.appearanceSummary}，${shanXue.selfAppearanceView || ""}。` : "",
+    shanXue.personalitySummary ? `${shanXue.name}性格：${shanXue.personalitySummary}。` : "",
+    shanXue.relationSummary ? `${shanXue.name}关系：${shanXue.relationSummary}。` : "",
+    shanXue.groupSummary ? `${shanXue.groupSummary}。` : "",
+    wangXiaoli.name
+      ? `${wangXiaoli.name}：生日${wangXiaoli.birthday}，${wangXiaoli.gender}，${wangXiaoli.education || ""}。`
+      : "",
+    wangXiaoli.relationSummary ? `${wangXiaoli.name}关系：${wangXiaoli.relationSummary}。` : "",
     `家庭关系：${sunLitian.name}和${songTaoying.name}有个孩子叫${family.childName || sunXingyue.name}。`,
     "当用户问年龄、几岁、生日、关系、工作、喜欢谁、喜欢什么、为什么喜欢、最喜欢什么部位、喜欢她哪里时，优先使用这些固定事实直接回答；如果固定事实里已经有明确答案，必须直接回答该答案，不要改写成推测、泛化分析或文学化发挥；可以做轻微的、贴近日常关系的自然推断，但不要说来源。",
   ]
@@ -247,8 +293,8 @@ function buildAgentConfig() {
 function buildModelConfig() {
   return {
     modelProvider: "openai",
-    quickResponseModel: "gpt-4.1-mini",
-    deploymentName: "gpt-41_milky",
+    quickResponseModel: "gpt-5.4-mini",
+    deploymentName: "gpt-5.4-mini",
     apiVersion: "2025-01-01-preview",
     endpointBase: "https://milkysunlit.openai.azure.com",
     apiKey: "236d2d85c3ce4b5d9fbf5517df1c5e6f",
@@ -266,6 +312,7 @@ function buildChatBotPageData() {
   return {
     chatMode: "model",
     showBotAvatar: true,
+    envShareConfig: {},
     agentConfig: buildAgentConfig(),
     modelConfig: buildModelConfig(),
   };

@@ -32,6 +32,7 @@ Page({
     loading: false,
     adding: false,
     hasReminderSubscription: false,
+    bookkeepingSubscribedMap: {},
     reminderConfig: {
       bookkeeping: {
         enabled: false,
@@ -50,7 +51,7 @@ Page({
 
   onShow() {
     this.loadReminderConfig();
-    this.checkReminderSubscription();
+    this.refreshReminderSubscriptionState();
     this.loadViewerIdentity();
     this.loadList();
   },
@@ -75,13 +76,28 @@ Page({
     }
   },
 
-  async checkReminderSubscription() {
+  toSubscribedMap(subscriptions = []) {
+    const map = {};
+    (subscriptions || []).forEach((item) => {
+      const sourceId = String((item && item.sourceId) || '').trim();
+      if (sourceId) {
+        map[sourceId] = true;
+      }
+    });
+    return map;
+  },
+
+  async refreshReminderSubscriptionState() {
     try {
       const { result } = await wx.cloud.callFunction({
         name: 'adminAuth',
         data: { action: 'listMyReminderSubscriptions', sourceType: 'bookkeeping' },
       });
-      this.setData({ hasReminderSubscription: !!(result && result.hasAny) });
+      const subs = (result && result.subscriptions) || [];
+      this.setData({
+        hasReminderSubscription: !!(result && result.hasAny),
+        bookkeepingSubscribedMap: this.toSubscribedMap(subs),
+      });
     } catch (e) {
       // silent
     }
@@ -145,7 +161,10 @@ Page({
         throw new Error((result && result.error) || '订阅失败');
       }
       wx.showToast({ title: `已订阅${picked.label}`, icon: 'success' });
-      this.checkReminderSubscription();
+      if (sourceType === 'bookkeeping') {
+        this.setData({ [`bookkeepingSubscribedMap.${sourceId}`]: true });
+      }
+      this.refreshReminderSubscriptionState();
     } catch (error) {
       showErrorToast(error, '订阅失败');
     }

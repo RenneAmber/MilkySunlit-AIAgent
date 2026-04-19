@@ -290,6 +290,14 @@ Component({
     }
   },
   methods: {
+    onTapPage: function () {
+      if (this.data.showMenu) {
+        this.setData({
+          showMenu: false,
+          tapMenuRecordId: "",
+        });
+      }
+    },
     buildSharedMemoryPrompt: function (memoryList = []) {
       const lines = (memoryList || [])
         .filter((item) => item && item.content)
@@ -312,13 +320,17 @@ Component({
       }
 
       try {
-        const { result } = await wx.cloud.callFunction({
-          name: "adminAuth",
-          data: {
-            action: "listSharedConceptMemories",
-            limit: 20,
-          },
-        });
+        const { result } = await this.awaitWithTimeout(
+          wx.cloud.callFunction({
+            name: "adminAuth",
+            data: {
+              action: "listSharedConceptMemories",
+              limit: 20,
+            },
+          }),
+          8000,
+          "共享记忆拉取超时"
+        );
         if (!result || result.error) {
           return this.data.sharedMemoryPrompt || "";
         }
@@ -331,6 +343,66 @@ Component({
         return sharedMemoryPrompt;
       } catch (error) {
         return this.data.sharedMemoryPrompt || "";
+      }
+    },
+    buildRagContextPrompt: function (ragList = []) {
+      const lines = (ragList || [])
+        .slice(0, 8)
+        .map((item, index) => {
+          const sourceMap = {
+            sharedConcept: "共享概念记忆",
+            chatMemory: "长期记忆",
+            diary: "日记",
+          };
+          const source = sourceMap[String((item && item.source) || "")] || "上下文";
+          const userLabel = String((item && item.userLabel) || "").trim();
+          const prefix = userLabel ? `${source}/${userLabel}` : source;
+          const content = String((item && item.content) || "").trim();
+          if (!content) {
+            return "";
+          }
+          return `${index + 1}. [${prefix}] ${content}`;
+        })
+        .filter(Boolean);
+
+      if (!lines.length) {
+        return "";
+      }
+
+      return `以下是基于当前问题检索出的候选上下文，请优先参考与问题直接相关的条目回答，不要照抄：\n${lines.join("\n")}`;
+    },
+    retrieveRagContext: async function (query = "", limit = 8) {
+      const normalizedQuery = String(query || "").trim();
+      if (!normalizedQuery) {
+        return {
+          list: [],
+          prompt: "",
+        };
+      }
+
+      try {
+        const { result } = await this.awaitWithTimeout(
+          wx.cloud.callFunction({
+            name: "adminAuth",
+            data: {
+              action: "retrieveRagContext",
+              query: normalizedQuery,
+              limit,
+            },
+          }),
+          6000,
+          "知识检索超时"
+        );
+        const ragList = (result && result.ragList) || [];
+        return {
+          list: ragList,
+          prompt: this.buildRagContextPrompt(ragList),
+        };
+      } catch (error) {
+        return {
+          list: [],
+          prompt: "",
+        };
       }
     },
     getTodayDateText: function () {
@@ -355,6 +427,46 @@ Component({
       if (!normalized) {
         return fallbackDate || this.getTodayDateText();
       }
+
+      const weekdayMap = {
+        "一": 1,
+        "二": 2,
+        "三": 3,
+        "四": 4,
+        "五": 5,
+        "六": 6,
+        "日": 7,
+        "天": 7,
+      };
+
+      const normalizeByWeekday = (prefix = "", weekdayChar = "") => {
+        const targetWeekday = weekdayMap[weekdayChar];
+        if (!targetWeekday) {
+          return "";
+        }
+        const base = new Date();
+        const currentWeekday = base.getDay() === 0 ? 7 : base.getDay();
+        let delta = targetWeekday - currentWeekday;
+        if (prefix === "下周") {
+          delta += 7;
+        } else if (delta < 0) {
+          // “这周/本周/周X”若当天已过，按下一个最近周X处理，避免生成过去日期。
+          delta += 7;
+        }
+        base.setDate(base.getDate() + delta);
+        return this.normalizeDateText(base, fallbackDate);
+      };
+
+      const explicitWeekMatch = normalized.match(/(这周|本周|下周)\s*(?:周|星期)?\s*([一二三四五六日天])/);
+      if (explicitWeekMatch) {
+        return normalizeByWeekday(explicitWeekMatch[1], explicitWeekMatch[2]);
+      }
+
+      const looseWeekMatch = normalized.match(/(?:周|星期)\s*([一二三四五六日天])/);
+      if (looseWeekMatch) {
+        return normalizeByWeekday("", looseWeekMatch[1]);
+      }
+
       const dateMatch = normalized.match(/(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})/);
       if (dateMatch) {
         return this.normalizeDateText(`${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`, fallbackDate);
@@ -453,7 +565,7 @@ Component({
         return null;
       }
       const parseDateTextFromInput = (sourceText = "") => {
-        const dateMatch = sourceText.match(/(?:日期|date|时间)\s*[：:]\s*(20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|今天|明天|后天)/i);
+        const dateMatch = sourceText.match(/(?:日期|date|时间)\s*[：:]\s*(20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|今天|明天|后天|这周(?:周|星期)?[一二三四五六日天]|本周(?:周|星期)?[一二三四五六日天]|下周(?:周|星期)?[一二三四五六日天]|(?:周|星期)[一二三四五六日天])/i);
         return this.pickDateFromText(dateMatch ? dateMatch[1] : sourceText, this.getTodayDateText());
       };
 
@@ -479,6 +591,15 @@ Component({
         }
         if (/(孙星玥)/.test(sourceText)) {
           return "孙星玥";
+        }
+        if (/(秦天)/.test(sourceText)) {
+          return "秦天";
+        }
+        if (/(山雪)/.test(sourceText)) {
+          return "山雪";
+        }
+        if (/(王晓莉)/.test(sourceText)) {
+          return "王晓莉";
         }
 
         const currentPersonName = String((this.data.viewerIdentity && this.data.viewerIdentity.personName) || "").trim();
@@ -519,7 +640,7 @@ Component({
           .replace(/(加到日历里面|加到日历里|加到日历|添加到日历里面|添加到日历里|添加到日历|记到日历里面|记到日历里|记到日历)\s*/g, "")
           .replace(/20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|今天|明天|后天/g, "")
           .replace(/(早上|清晨|今早|中午|下午|晚上|今晚|早餐|午饭|午餐|晚饭|晚餐|夜宵)/g, "")
-          .replace(/(我老婆|老婆|媳妇|爱人|对象|我老公|老公|我女儿|女儿|宝宝|宋陶颖|孙励天|孙星玥|我)\s*/g, "")
+          .replace(/(我老婆|老婆|媳妇|爱人|对象|我老公|老公|我女儿|女儿|宝宝|宋陶颖|孙励天|孙星玥|秦天|山雪|王晓莉|我)\s*/g, "")
           .replace(/^[，,。；;:：\s]+|[，,。；;:：\s]+$/g, "")
           .trim();
 
@@ -579,8 +700,8 @@ Component({
       }
 
       // 支持自然句式：例如“今天中午我老婆吃东北菜”
-      const hasDateHint = /(今天|明天|后天|20\d{2}[-/.]\d{1,2}[-/.]\d{1,2})/.test(normalized);
-      const hasEventHint = /(早餐|午饭|午餐|晚饭|晚餐|夜宵|吃|喝|去|做|买|看|参加|安排|计划)/.test(normalized);
+      const hasDateHint = /(今天|明天|后天|20\d{2}[-/.]\d{1,2}[-/.]\d{1,2}|这周(?:周|星期)?[一二三四五六日天]|本周(?:周|星期)?[一二三四五六日天]|下周(?:周|星期)?[一二三四五六日天]|(?:周|星期)[一二三四五六日天])/.test(normalized);
+      const hasEventHint = /(早餐|午饭|午餐|晚饭|晚餐|夜宵|吃|喝|去|做|买|看|参加|安排|计划|体检|检查|复查|挂号|看病|医院|就诊|复诊)/.test(normalized);
       if (!hasDateHint || !hasEventHint) {
         return null;
       }
@@ -758,15 +879,19 @@ Component({
     },
     listSharedCalendarByDate: async function (dateText = "", limit = 20, skip = 0) {
       try {
-        const { result } = await wx.cloud.callFunction({
-          name: "adminAuth",
-          data: {
-            action: "listSharedCalendar",
-            date: this.normalizeDateText(dateText || this.getTodayDateText(), this.getTodayDateText()),
-            limit,
-            skip,
-          },
-        });
+        const { result } = await this.awaitWithTimeout(
+          wx.cloud.callFunction({
+            name: "adminAuth",
+            data: {
+              action: "listSharedCalendar",
+              date: this.normalizeDateText(dateText || this.getTodayDateText(), this.getTodayDateText()),
+              limit,
+              skip,
+            },
+          }),
+          8000,
+          "日历读取超时"
+        );
         return (result && result.calendarList) || [];
       } catch (error) {
         return [];
@@ -951,7 +1076,7 @@ Component({
         return false;
       }
       // 日历仅匹配明确语义，避免通用动作词（新增/删除/修改/查询）误触发。
-      return /(日历|提醒|日程|安排|计划|行程|待办|约会|早餐|午饭|晚饭|干了啥|做了什么)/.test(normalized);
+      return /(日历|提醒|日程|安排|计划|行程|待办|约会|早餐|午饭|晚饭|体检|检查|复查|挂号|看病|医院|就诊|复诊|干了啥|做了什么)/.test(normalized);
     },
     hasBookkeepingIntent: function (text = "") {
       const normalized = String(text || "").trim();
@@ -969,13 +1094,17 @@ Component({
     },
     listSharedBookkeeping: async function (limit = 20) {
       try {
-        const { result } = await wx.cloud.callFunction({
-          name: "adminAuth",
-          data: {
-            action: "listSharedBookkeeping",
-            limit,
-          },
-        });
+        const { result } = await this.awaitWithTimeout(
+          wx.cloud.callFunction({
+            name: "adminAuth",
+            data: {
+              action: "listSharedBookkeeping",
+              limit,
+            },
+          }),
+          8000,
+          "账单读取超时"
+        );
         return (result && result.bookkeepingList) || [];
       } catch (error) {
         return [];
@@ -1348,14 +1477,18 @@ Component({
     },
     listSharedRecipes: async function (keyword = "", limit = 12) {
       try {
-        const { result } = await wx.cloud.callFunction({
-          name: "adminAuth",
-          data: {
-            action: "listSharedRecipes",
-            keyword,
-            limit,
-          },
-        });
+        const { result } = await this.awaitWithTimeout(
+          wx.cloud.callFunction({
+            name: "adminAuth",
+            data: {
+              action: "listSharedRecipes",
+              keyword,
+              limit,
+            },
+          }),
+          8000,
+          "菜谱读取超时"
+        );
         return (result && result.recipeList) || [];
       } catch (error) {
         return [];
@@ -2547,6 +2680,51 @@ Component({
       }
       await this.sendMessage(event.currentTarget.dataset.message);
     },
+    runChatSideEffects: async function (inputValue = "", options = {}) {
+      const sideEffectMessages = [];
+      const { skipCalendar = false, skipDiary = false } = options || {};
+
+      try {
+        const isBookkeepingIntent = this.hasBookkeepingIntent(inputValue);
+        const isRecipeIntent = this.hasRecipeIntent(inputValue);
+        if (!skipDiary) {
+          const diaryDraft = this.extractDiaryDraftFromInput(inputValue);
+          if (diaryDraft) {
+            const savedDiary = await this.awaitWithTimeout(this.saveDiaryFromChat(diaryDraft), 5000, "日记写入超时");
+            if (savedDiary) {
+              sideEffectMessages.push("日记已记录");
+            }
+          }
+        }
+
+        // 记账/菜谱语义不应触发日历侧写，避免误写入日历。
+        if (!skipCalendar && !isBookkeepingIntent && !isRecipeIntent) {
+          const calendarDraft = this.extractCalendarDraftFromInput(inputValue);
+          if (calendarDraft) {
+            const savedCalendar = await this.awaitWithTimeout(this.addCalendarReminderFromChat(calendarDraft), 7000, "日历写入超时");
+            if (savedCalendar) {
+              sideEffectMessages.push("日程已添加");
+              const calendarMemory = this.buildCalendarMemoryContent(calendarDraft);
+              if (calendarMemory) {
+                this.saveLocalMemory(calendarMemory);
+                this.saveSharedMemoryToCloud(calendarMemory)
+                  .then((cloudMemoryResult) => {
+                    if (cloudMemoryResult && cloudMemoryResult.success) {
+                      return this.loadSharedMemoryPromptFromCloud(true);
+                    }
+                    return null;
+                  })
+                  .catch(() => null);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("[agent-ui] runChatSideEffects failed", error);
+      }
+
+      return sideEffectMessages;
+    },
     sendMessage: async function (message) {
       if (this.data.showFileList) {
         this.setData({
@@ -2624,7 +2802,14 @@ Component({
         console.warn("[agent-ui] bot mode circuit-breaker fallback -> model mode");
         chatMode = "model";
       }
-      const shouldSkipCalendarSideEffect = isModelOpenAiMode && this.hasCalendarIntent(inputValue);
+      if (!["bot", "model"].includes(chatMode)) {
+        console.warn("[agent-ui] invalid chatMode fallback -> model", { rawChatMode: chatMode });
+        chatMode = isOpenAiConfigured ? "model" : "bot";
+      }
+      const isBookkeepingIntent = this.hasBookkeepingIntent(inputValue);
+      // 日历规则匹配仅作为 AI 异常时的兜底；AI 正常可用时不走本地明确语义侧写。
+      const shouldSkipCalendarSideEffect = isBookkeepingIntent || isModelOpenAiMode;
+      const shouldSkipDiarySideEffect = isBookkeepingIntent;
 
       // 先立刻更新 UI、切换发送状态，side effects 并行执行不阻塞渲染
       const userRecord = {
@@ -2668,6 +2853,7 @@ Component({
       // side effects 异步并行，不阻塞主流程
       this.runChatSideEffects(inputValue, {
         skipCalendar: shouldSkipCalendarSideEffect,
+        skipDiary: shouldSkipDiarySideEffect,
       }).then((sideEffectMessages) => {
         if (sideEffectMessages && sideEffectMessages.length) {
           wx.showToast({
@@ -2687,7 +2873,9 @@ Component({
           const lastValueIndex = directValue.length - 1;
           const lastValue = directValue[lastValueIndex];
           const suffix = String((bookkeepingResult && bookkeepingResult.replySuffix) || '').trim();
-          lastValue.content = suffix ? `好的。${suffix}` : '好的，已为你处理。';
+          lastValue.content = bookkeepingResult && bookkeepingResult.applied
+            ? (suffix ? `好的。${suffix}` : '好的，已为你处理。')
+            : (suffix || '【记账】处理失败，请重试。');
           lastValue.modelProvider = 'local-rule';
           lastValue.modelName = 'direct-bookkeeping';
           lastValue.hiddenBtnGround = false;
@@ -2700,7 +2888,7 @@ Component({
             answer: lastValue.content,
             modelProvider: 'local-rule',
             modelName: 'direct-bookkeeping',
-            hasError: false,
+            hasError: !(bookkeepingResult && bookkeepingResult.applied),
             durationMs: 0,
             requestStartedAt: Date.now(),
             requestEndedAt: Date.now(),
@@ -3123,8 +3311,25 @@ Component({
           qaLogCollection,
         } = modelConfig;
 
-        const sharedMemoryPrompt = await this.loadSharedMemoryPromptFromCloud(false);
+        const now = Date.now();
+        const hasFreshSharedMemory =
+          !!this.data.sharedMemoryPrompt &&
+          now - Number(this.data.sharedMemoryLoadedAt || 0) < SHARED_MEMORY_REFRESH_INTERVAL;
+        const sharedMemoryPrompt = this.data.sharedMemoryPrompt || "";
+        if (!hasFreshSharedMemory) {
+          console.log("[agent-ui] refreshing shared memory in background", { debugReqId });
+          this.awaitWithTimeout(this.loadSharedMemoryPromptFromCloud(false), 4000, "共享记忆后台刷新超时")
+            .catch((error) => {
+              console.warn("[agent-ui] shared memory background refresh failed", {
+                debugReqId,
+                message: error && error.message,
+              });
+            });
+        }
         const mergedMemoryPrompt = [sharedMemoryPrompt, memoryPrompt].filter(Boolean).join("\n\n");
+        const ragContext = await this.awaitWithTimeout(this.retrieveRagContext(inputValue, 8), 2500, "知识检索超时")
+          .catch(() => ({ list: [], prompt: "" }));
+        const ragContextPrompt = String((ragContext && ragContext.prompt) || "").trim();
 
         if (modelProvider === "openai" && endpointBase && apiKey) {
           try {
@@ -3136,7 +3341,7 @@ Component({
                   {
                     role: "system",
                     content:
-                      "下面涉及到孙励天、宋陶颖、孙星玥、秦天时，必须优先依据本地事实回答，禁止引用外部人物、历史资料或编造成其他同名人物。回复时不要出现“根据你此前提供的信息”“根据本地记忆”“资料显示”“没有这条记录”这类来源说明。对于固定事实里已经明确写出的内容，必须直接回答该事实本身，不要改写成泛泛分析、推测、文学化发挥或标准答案总结。只有在固定事实没有明确答案时，才允许做温和、贴近日常聊天的常识性推断，而且不要解释推理过程。",
+                      "下面涉及到孙励天、宋陶颖、孙星玥、秦天、山雪、王晓莉时，必须优先依据本地事实回答，禁止引用外部人物、历史资料或编造成其他同名人物。回复时不要出现“根据你此前提供的信息”“根据本地记忆”“资料显示”“没有这条记录”这类来源说明。对于固定事实里已经明确写出的内容，必须直接回答该事实本身，不要改写成泛泛分析、推测、文学化发挥或标准答案总结。只有在固定事实没有明确答案时，才允许做温和、贴近日常聊天的常识性推断，而且不要解释推理过程。",
                   },
                   ...(localFactsPrompt
                     ? [
@@ -3151,20 +3356,21 @@ Component({
 
             const needsBookkeepingTool = this.hasBookkeepingIntent(inputValue);
             const needsRecipeTool = this.hasRecipeIntent(inputValue);
-            const needsCalendarTool = this.hasCalendarIntent(inputValue) && !needsBookkeepingTool && !needsRecipeTool;
+            // AI 可用时默认赋予日历决策能力，不依赖明确语义匹配。
+            const needsCalendarTool = !needsBookkeepingTool && !needsRecipeTool;
+            // 明确语义匹配只用于本地兜底与预览拉取，避免无意义查询。
+            const calendarRuleIntent = this.hasCalendarIntent(inputValue);
             const needsStructuredDecision = needsCalendarTool || needsBookkeepingTool || needsRecipeTool;
             const directBookkeepingAction = needsBookkeepingTool ? this.inferDirectBookkeepingAction(inputValue) : null;
-            const targetDate = this.pickDateFromText(inputValue, this.getTodayDateText());
-            const calendarPreview = needsCalendarTool ? await this.listSharedCalendarByDate(targetDate, 20, 0) : [];
-            const bookkeepingPreview = needsBookkeepingTool ? await this.listSharedBookkeeping(8) : [];
-            const recipePreview = needsRecipeTool ? await this.listSharedRecipes("", 6) : [];
 
             if (directBookkeepingAction) {
               const bookkeepingResult = await this.executeBookkeepingActionFromAi(directBookkeepingAction, inputValue);
               const newValue = [...this.data.chatRecords];
               const lastValue = newValue[newValue.length - 1];
-              const suffix = (bookkeepingResult && bookkeepingResult.replySuffix) || "\n\n【记账】已处理。";
-              lastValue.content = `好的。${suffix}`;
+              const suffix = String((bookkeepingResult && bookkeepingResult.replySuffix) || "").trim();
+              lastValue.content = bookkeepingResult && bookkeepingResult.applied
+                ? (suffix ? `好的。${suffix}` : "好的，已为你处理。")
+                : (suffix || "【记账】处理失败，请重试。");
               lastValue.modelProvider = "local-rule";
               lastValue.modelName = "direct-bookkeeping";
               lastValue.hiddenBtnGround = false;
@@ -3174,13 +3380,29 @@ Component({
                 answer: lastValue.content,
                 modelProvider: "local-rule",
                 modelName: "direct-bookkeeping",
-                hasError: false,
+                hasError: !(bookkeepingResult && bookkeepingResult.applied),
                 durationMs: Date.now() - requestStartedAt,
                 requestStartedAt,
                 requestEndedAt: Date.now(),
               });
               return;
             }
+
+            const targetDate = this.pickDateFromText(inputValue, this.getTodayDateText());
+            console.log("[agent-ui] fetching previews", { debugReqId, needsCalendarTool, needsBookkeepingTool, needsRecipeTool });
+            const [calendarPreview, bookkeepingPreview, recipePreview] = await Promise.all([
+              (needsCalendarTool && calendarRuleIntent)
+                ? this.awaitWithTimeout(this.listSharedCalendarByDate(targetDate, 20, 0), 2500, "日历预览超时")
+                : Promise.resolve([]),
+              needsBookkeepingTool
+                ? this.awaitWithTimeout(this.listSharedBookkeeping(8), 2500, "账单预览超时")
+                : Promise.resolve([]),
+              needsRecipeTool
+                ? this.awaitWithTimeout(this.listSharedRecipes("", 6), 2500, "菜谱预览超时")
+                : Promise.resolve([]),
+            ]);
+            console.log("[agent-ui] previews ready", { debugReqId });
+
             const calendarToolSystemPrompt = {
               role: "system",
               content:
@@ -3226,6 +3448,14 @@ Component({
                     },
                   ]
                 : []),
+              ...(ragContextPrompt
+                ? [
+                    {
+                      role: "system",
+                      content: ragContextPrompt,
+                    },
+                  ]
+                : []),
               // 仅在命中对应工具意图时注入提示，避免普通消息多消耗 token
               ...(needsCalendarTool ? [calendarToolSystemPrompt] : []),
               ...(needsBookkeepingTool ? [bookkeepingToolSystemPrompt] : []),
@@ -3249,7 +3479,10 @@ Component({
             const normalizedEndpoint = endpointBase.replace(/\/+$/, "");
             const realDeployment = deploymentName || quickResponseModel;
             const realApiVersion = apiVersion || "2025-01-01-preview";
+            const modelId = String(realDeployment || quickResponseModel || "").toLowerCase();
+            const tokenLimitField = /gpt-5/.test(modelId) ? "max_completion_tokens" : "max_tokens";
             const url = `${normalizedEndpoint}/openai/deployments/${realDeployment}/chat/completions?api-version=${realApiVersion}`;
+            console.log("[agent-ui] calling openai", { debugReqId, url: url.split("?")[0], deployment: realDeployment, msgCount: requestMessages.length });
 
             const response = await new Promise((resolve, reject) => {
               wx.request({
@@ -3258,7 +3491,7 @@ Component({
                 timeout: 20000,
                 data: {
                   messages: requestMessages,
-                  max_tokens: 2000,
+                  [tokenLimitField]: 2000,
                   // 仅命中工具场景时强制 JSON，普通聊天不额外约束
                   ...(needsStructuredDecision ? { response_format: { type: "json_object" } } : {}),
                 },
@@ -3267,6 +3500,7 @@ Component({
                   "api-key": apiKey,
                 },
                 success: (res) => {
+                  console.log("[agent-ui] openai response", { debugReqId, status: res.statusCode });
                   if (res.statusCode >= 400) {
                     reject(new Error(res?.data?.error?.message || `HTTP ${res.statusCode}`));
                     return;
@@ -3274,6 +3508,7 @@ Component({
                   resolve(res.data || {});
                 },
                 fail: (err) => {
+                  console.error("[agent-ui] openai request failed", { debugReqId, errMsg: err?.errMsg });
                   reject(new Error(err?.errMsg || "请求失败"));
                 },
               });
@@ -3288,6 +3523,17 @@ Component({
             let calendarHandled = false;
             let bookkeepingHandled = false;
             let recipeHandled = false;
+            let calendarWriteSucceeded = false;
+            let bookkeepingWriteSucceeded = false;
+            let recipeWriteSucceeded = false;
+            const userAskedCalendarSave =
+              /帮我记下|帮我记一下|记一下|记下|提醒我|加提醒|添加提醒|日历提醒|加到日历|加日历|添加日历|记到日历|写到日历/.test(String(inputValue || ""));
+            const userAskedBookkeepingSave =
+              needsBookkeepingTool &&
+              /记账|账单|新增账单|添加账单|加个账单|删账|删除账单|改账|还款|归还|还钱/.test(String(inputValue || ""));
+            const userAskedRecipeSave =
+              needsRecipeTool &&
+              /新增菜谱|添加菜谱|记菜谱|记下菜谱|保存菜谱|加个菜谱/.test(String(inputValue || ""));
             if (parsedDecision && typeof parsedDecision.reply === "string" && parsedDecision.reply.trim()) {
               finalReply = parsedDecision.reply.trim();
             } else if (parsedDecision) {
@@ -3324,7 +3570,11 @@ Component({
               if (calendarResult && calendarResult.replySuffix) {
                 finalReply = `${finalReply}${calendarResult.replySuffix}`;
               }
-              calendarHandled = !!(calendarResult && (calendarResult.applied || calendarResult.replySuffix));
+              const calendarActionType = String((resolvedCalendarAction && resolvedCalendarAction.type) || "").toLowerCase();
+              calendarHandled = !!(calendarResult && calendarResult.applied);
+              if (calendarHandled && ["add", "update", "delete"].includes(calendarActionType)) {
+                calendarWriteSucceeded = true;
+              }
             }
 
             if (resolvedBookkeepingAction) {
@@ -3332,7 +3582,11 @@ Component({
               if (bookkeepingResult && bookkeepingResult.replySuffix) {
                 finalReply = `${finalReply}${bookkeepingResult.replySuffix}`;
               }
-              bookkeepingHandled = !!(bookkeepingResult && (bookkeepingResult.applied || bookkeepingResult.replySuffix));
+              const bookkeepingActionType = String((resolvedBookkeepingAction && resolvedBookkeepingAction.type) || "").toLowerCase();
+              bookkeepingHandled = !!(bookkeepingResult && bookkeepingResult.applied);
+              if (bookkeepingHandled && ["add", "repay", "update", "delete", "suggestpenalty", "decidepenalty"].includes(bookkeepingActionType)) {
+                bookkeepingWriteSucceeded = true;
+              }
             }
 
             if (resolvedRecipeAction) {
@@ -3340,11 +3594,15 @@ Component({
               if (recipeResult && recipeResult.replySuffix) {
                 finalReply = `${finalReply}${recipeResult.replySuffix}`;
               }
-              recipeHandled = !!(recipeResult && (recipeResult.applied || recipeResult.replySuffix));
+              const recipeActionType = String((resolvedRecipeAction && resolvedRecipeAction.type) || "").toLowerCase();
+              recipeHandled = !!(recipeResult && recipeResult.applied);
+              if (recipeHandled && ["add", "update", "delete"].includes(recipeActionType)) {
+                recipeWriteSucceeded = true;
+              }
             }
 
             // 兜底：模型未返回结构化 calendarAction 时，保证“说记下来了却未落库”的问题不会发生。
-            if (needsCalendarTool && !calendarHandled && !bookkeepingHandled && !recipeHandled) {
+            if (calendarRuleIntent && !calendarHandled && !bookkeepingHandled && !recipeHandled) {
               const fallbackRuleDraft = this.extractCalendarDraftFromInput(inputValue);
               const fallbackDraft = await this.resolveCalendarDraftWithAi(inputValue, fallbackRuleDraft);
               if (fallbackDraft) {
@@ -3360,6 +3618,7 @@ Component({
                   }
                   finalReply = `${finalReply}\n\n【日历操作】已添加：${fallbackDraft.date} ${fallbackDraft.title}`;
                   calendarHandled = true;
+                  calendarWriteSucceeded = true;
                 }
               }
 
@@ -3373,6 +3632,16 @@ Component({
                   calendarHandled = true;
                 }
               }
+            }
+
+            if (userAskedCalendarSave && !calendarWriteSucceeded && !bookkeepingHandled && !recipeHandled) {
+              finalReply = `${String(finalReply || "").trim()}\n\n【日历操作】未成功写入，请重试，例如说：加到日历：${targetDate} 具体事项`;
+            }
+            if (userAskedBookkeepingSave && !bookkeepingWriteSucceeded && !calendarHandled && !recipeHandled) {
+              finalReply = `${String(finalReply || "").trim()}\n\n【记账】未成功写入，请重试并包含金额，例如：记账：孙励天向宋陶颖借100元，5月1日归还。`;
+            }
+            if (userAskedRecipeSave && !recipeWriteSucceeded && !calendarHandled && !bookkeepingHandled) {
+              finalReply = `${String(finalReply || "").trim()}\n\n【菜谱】未成功写入，请重试并带上菜名，例如：添加菜谱：番茄炒蛋，食材番茄鸡蛋，步骤...`;
             }
 
             if (!String(finalReply || "").trim()) {
@@ -3434,6 +3703,22 @@ Component({
         const cloudInstance = await getCloudInstance(this.data.envShareConfig);
         const ai = cloudInstance.extend.AI;
         const baseMessages = [
+          ...(localFactsPrompt
+            ? [
+                {
+                  role: "system",
+                  content: localFactsPrompt,
+                },
+              ]
+            : []),
+          ...(ragContextPrompt
+            ? [
+                {
+                  role: "system",
+                  content: ragContextPrompt,
+                },
+              ]
+            : []),
           ...(mergedMemoryPrompt
             ? [
                 {
@@ -3547,7 +3832,44 @@ Component({
           }
         }
       }
+      } catch (error) {
+        console.error("[agent-ui] sendMessage unexpected error", error);
+        const fallbackValue = [...(this.data.chatRecords || [])];
+        const lastIndex = fallbackValue.length - 1;
+        if (lastIndex >= 0) {
+          const lastValue = fallbackValue[lastIndex] || {};
+          if (lastValue.role === "assistant") {
+            if (!String(lastValue.content || "").trim()) {
+              lastValue.content = this.data.defaultErrorMsg;
+            }
+            lastValue.error = (error && error.message) || "服务异常";
+            lastValue.hiddenBtnGround = false;
+            fallbackValue[lastIndex] = lastValue;
+          }
+        }
+        this.setData({
+          chatRecords: fallbackValue,
+          chatStatus: 0,
+        });
       } finally {
+        if (this.data.chatStatus !== 0) {
+          const records = [...(this.data.chatRecords || [])];
+          const lastIndex = records.length - 1;
+          if (lastIndex >= 0) {
+            const last = records[lastIndex] || {};
+            if (last.role === "assistant" && !String(last.content || "").trim()) {
+              last.content = this.data.defaultErrorMsg;
+              last.error = last.error || "请求未完成，请重试";
+              last.hiddenBtnGround = false;
+              records[lastIndex] = last;
+            }
+          }
+          this.setData({
+            chatRecords: records,
+            chatStatus: 0,
+          });
+          console.warn("[agent-ui] sendMessage finally forced unlock");
+        }
         this.stopChatBusyGuard();
       }
     },

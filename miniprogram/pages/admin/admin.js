@@ -4,7 +4,7 @@ Page({
     isAdmin: false,
     envId: '',
     pageSize: 20,
-    userFilterOptions: ['all', '宋陶颖', '孙励天'],
+    userFilterOptions: ['all', '宋陶颖', '孙励天', '秦天', '山雪', '王晓莉'],
     selectedUserFilter: 'all',
     diaryList: [],
     diaryCount: 0,

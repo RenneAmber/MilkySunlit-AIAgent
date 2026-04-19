@@ -25,6 +25,34 @@ function formatDateTime(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function parseDateParts(dateText = '') {
+  const match = String(dateText || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
+}
+
+function computeAnniversaryYears(dateText = '') {
+  const parts = parseDateParts(dateText);
+  if (!parts) {
+    return 0;
+  }
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+  const currentDay = today.getDate();
+  let targetYear = currentYear;
+  if (currentMonth > parts.month || (currentMonth === parts.month && currentDay > parts.day)) {
+    targetYear += 1;
+  }
+  return Math.max(0, targetYear - parts.year);
+}
+
 const STAR_PALETTE = [
   ['255,255,255', '200,220,255', 0.7],
   ['255,255,255', '255,255,255', 0.65],
@@ -61,6 +89,9 @@ Page({
     calendarLoading: false,
     adding: false,
     deletingId: '',
+    calendarSubscribedMap: {},
+    anniversarySubscribedMap: {},
+    anniversaryAllSubscribed: false,
     anniversaries: [],
     reminderConfig: {
       anniversary: {
@@ -87,11 +118,84 @@ Page({
     this.generateScene();
     this.generateCalendarDays();
     await this.loadReminderConfig();
+    await this.refreshReminderSubscriptionState();
     await this.initSharedCalendar();
   },
 
   async onShow() {
+    await this.refreshReminderSubscriptionState();
     await this.loadAllMonthData();
+  },
+
+  toSubscribedMap(subscriptions = []) {
+    const map = {};
+    (subscriptions || []).forEach((item) => {
+      const sourceId = String((item && item.sourceId) || '').trim();
+      if (sourceId) {
+        map[sourceId] = true;
+      }
+    });
+    return map;
+  },
+
+  syncAnniversarySubscribeSummary(overrides = {}) {
+    const anniversaries = Array.isArray(overrides.anniversaries) ? overrides.anniversaries : (this.data.anniversaries || []);
+    const subscribedMap = overrides.anniversarySubscribedMap || this.data.anniversarySubscribedMap || {};
+    const allSubscribed = anniversaries.length > 0 && anniversaries.every((item) => !!subscribedMap[String((item && item.id) || '').trim()]);
+    this.setData({ anniversaryAllSubscribed: allSubscribed });
+  },
+
+  pickDefaultReminderOption(options = []) {
+    const reminderOptions = Array.isArray(options) ? options : [];
+    if (!reminderOptions.length) {
+      return null;
+    }
+    const recommended = reminderOptions.find((item) => item && item.recommended);
+    return recommended || reminderOptions[0];
+  },
+
+  decorateAnniversaryItem(item = {}) {
+    const normalized = { ...item };
+    if (normalized.type === 'milestone' && normalized.date) {
+      const years = computeAnniversaryYears(normalized.date);
+      if (years > 0) {
+        normalized.anniversaryLabel = `${years}周年`;
+      }
+    }
+    return normalized;
+  },
+
+  decorateAnniversaries(list = []) {
+    return (Array.isArray(list) ? list : []).map((item) => this.decorateAnniversaryItem(item));
+  },
+
+  async refreshReminderSubscriptionState() {
+    try {
+      const [calendarRes, anniversaryRes] = await Promise.all([
+        wx.cloud.callFunction({
+          name: 'adminAuth',
+          data: { action: 'listMyReminderSubscriptions', sourceType: 'calendar' },
+        }),
+        wx.cloud.callFunction({
+          name: 'adminAuth',
+          data: { action: 'listMyReminderSubscriptions', sourceType: 'anniversary' },
+        }),
+      ]);
+
+      const calendarSubs = (calendarRes && calendarRes.result && calendarRes.result.subscriptions) || [];
+      const anniversarySubs = (anniversaryRes && anniversaryRes.result && anniversaryRes.result.subscriptions) || [];
+
+      const calendarSubscribedMap = this.toSubscribedMap(calendarSubs);
+      const anniversarySubscribedMap = this.toSubscribedMap(anniversarySubs);
+
+      this.setData({
+        calendarSubscribedMap,
+        anniversarySubscribedMap,
+      });
+      this.syncAnniversarySubscribeSummary({ anniversarySubscribedMap });
+    } catch (error) {
+      // silent
+    }
   },
 
   async initSharedCalendar() {
@@ -121,7 +225,10 @@ Page({
           anniversary: { enabled: false, templateId: '', options: [] },
           calendar: { enabled: false, templateId: '', options: [] },
         },
-        anniversaries: (result && result.reminderConfig && result.reminderConfig.anniversaries) || [],
+        anniversaries: this.decorateAnniversaries((result && result.reminderConfig && result.reminderConfig.anniversaries) || []),
+      });
+      this.syncAnniversarySubscribeSummary({
+        anniversaries: this.decorateAnniversaries((result && result.reminderConfig && result.reminderConfig.anniversaries) || []),
       });
     } catch (error) {
       this.setData({
@@ -129,6 +236,8 @@ Page({
           anniversary: { enabled: false, templateId: '', options: [] },
           calendar: { enabled: false, templateId: '', options: [] },
         },
+        anniversaries: [],
+        anniversaryAllSubscribed: false,
       });
     }
   },
@@ -190,6 +299,16 @@ Page({
       if (!(result && result.success)) {
         throw new Error((result && result.error) || '订阅失败');
       }
+      if (sourceType === 'calendar' || sourceType === 'anniversary') {
+        const mapKey = sourceType === 'calendar' ? 'calendarSubscribedMap' : 'anniversarySubscribedMap';
+        this.setData({
+          [`${mapKey}.${sourceId}`]: true,
+        });
+        if (sourceType === 'anniversary') {
+          this.syncAnniversarySubscribeSummary();
+        }
+      }
+      this.refreshReminderSubscriptionState();
       wx.showToast({ title: `已订阅${picked.label}`, icon: 'success' });
     } catch (error) {
       wx.showToast({ title: error.message || '订阅失败', icon: 'none' });
@@ -253,7 +372,25 @@ Page({
         },
       });
       if (!(result && result.success)) {
-        throw new Error((result && result.error) || '测试发送失败');
+        const debug = (result && result.debug) || {};
+        const debugText = [
+          result && result.error ? `error: ${result.error}` : '',
+          debug.errCode !== undefined && debug.errCode !== null ? `errCode: ${debug.errCode}` : '',
+          debug.errMsg ? `errMsg: ${debug.errMsg}` : '',
+          debug.templateId ? `templateId: ${debug.templateId}` : '',
+          debug.templatePayload ? `payload: ${JSON.stringify(debug.templatePayload)}` : '',
+        ].filter(Boolean).join('\n');
+        console.error('testReminderSend failed:', result);
+        await new Promise((resolve) => {
+          wx.showModal({
+            title: '测试发送失败',
+            content: debugText || '请检查云函数日志',
+            showCancel: false,
+            success: () => resolve(),
+            fail: () => resolve(),
+          });
+        });
+        return;
       }
       wx.showToast({ title: '测试已发送', icon: 'success' });
     } catch (error) {
@@ -277,6 +414,76 @@ Page({
     const sourceId = String(event.currentTarget.dataset.id || '').trim();
     const options = (((this.data.reminderConfig || {}).anniversary || {}).options) || [];
     await this.requestReminderSubscribe('anniversary', sourceId, options);
+  },
+
+  async subscribeAllAnniversaryReminders() {
+    const anniversaries = Array.isArray(this.data.anniversaries) ? this.data.anniversaries : [];
+    if (!anniversaries.length) {
+      wx.showToast({ title: '暂无可订阅纪念日', icon: 'none' });
+      return;
+    }
+    if (this.data.anniversaryAllSubscribed) {
+      wx.showToast({ title: '已全部订阅', icon: 'none' });
+      return;
+    }
+
+    const config = (this.data.reminderConfig && this.data.reminderConfig.anniversary) || {};
+    const templateId = String(config.templateId || '').trim();
+    const picked = this.pickDefaultReminderOption(config.options || []);
+    if (!templateId || !picked || !picked.value) {
+      wx.showToast({ title: '提醒配置不可用', icon: 'none' });
+      return;
+    }
+
+    const accepted = await this.requestTemplateConsent(templateId);
+    if (!accepted) {
+      wx.showToast({ title: '未授权微信提醒', icon: 'none' });
+      return;
+    }
+
+    const nextMap = { ...(this.data.anniversarySubscribedMap || {}) };
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const item of anniversaries) {
+      const sourceId = String((item && item.id) || '').trim();
+      if (!sourceId || nextMap[sourceId]) {
+        continue;
+      }
+      try {
+        const { result } = await wx.cloud.callFunction({
+          name: 'adminAuth',
+          data: {
+            action: 'subscribeReminderNotification',
+            sourceType: 'anniversary',
+            sourceId,
+            reminderType: picked.value,
+          },
+        });
+        if (result && result.success) {
+          nextMap[sourceId] = true;
+          successCount += 1;
+        } else {
+          failCount += 1;
+        }
+      } catch (error) {
+        failCount += 1;
+      }
+    }
+
+    this.setData({ anniversarySubscribedMap: nextMap });
+    this.syncAnniversarySubscribeSummary({ anniversarySubscribedMap: nextMap });
+    this.refreshReminderSubscriptionState();
+
+    if (successCount > 0 && failCount === 0) {
+      wx.showToast({ title: `已订阅${successCount}项`, icon: 'success' });
+      return;
+    }
+    if (successCount > 0) {
+      wx.showToast({ title: `成功${successCount}项，失败${failCount}项`, icon: 'none' });
+      return;
+    }
+    wx.showToast({ title: '订阅失败，请重试', icon: 'none' });
   },
 
   async testAnniversaryReminder(event) {
