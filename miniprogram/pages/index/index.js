@@ -419,6 +419,12 @@ Page({
     });
   },
 
+  goChecklist() {
+    wx.navigateTo({
+      url: '/pages/checklist/checklist'
+    });
+  },
+
   scrollToAnchor(e) {
     const anchorId = e.currentTarget.dataset.anchor;
     const query = wx.createSelectorQuery();

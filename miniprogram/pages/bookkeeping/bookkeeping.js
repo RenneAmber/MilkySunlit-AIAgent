@@ -26,6 +26,17 @@ function showErrorToast(error, fallback = "操作失败") {
   });
 }
 
+function buildBookkeepingRelationText(item = {}) {
+  const fromName = String(item.fromName || '').trim() || '出借人';
+  const toName = String(item.toName || '').trim() || '欠款人';
+  const transferAmount = formatMoney(item.transferAmount);
+  const outstandingAmount = formatMoney(item.outstandingAmount);
+  return {
+    lendingText: `${fromName}借给${toName}，¥${transferAmount}`,
+    debtText: `${toName}欠${fromName}，¥${outstandingAmount}`,
+  };
+}
+
 Page({
   data: {
     list: [],
@@ -170,81 +181,10 @@ Page({
     }
   },
 
-  async chooseReminderOption(options = []) {
-    const reminderOptions = Array.isArray(options) ? options : [];
-    if (!reminderOptions.length) {
-      return null;
-    }
-    const pickedIndex = await new Promise((resolve) => {
-      wx.showActionSheet({
-        itemList: reminderOptions.map((item) => item.label),
-        success: (res) => resolve(res.tapIndex),
-        fail: () => resolve(-1),
-      });
-    });
-    return pickedIndex >= 0 && reminderOptions[pickedIndex] ? reminderOptions[pickedIndex] : null;
-  },
-
-  async requestTemplateConsent(templateId = '') {
-    const finalTemplateId = String(templateId || '').trim();
-    if (!finalTemplateId) {
-      return false;
-    }
-    try {
-      const subscribeRes = await new Promise((resolve, reject) => {
-        wx.requestSubscribeMessage({
-          tmplIds: [finalTemplateId],
-          success: resolve,
-          fail: reject,
-        });
-      });
-      return String(subscribeRes[finalTemplateId] || '') === 'accept';
-    } catch (error) {
-      return false;
-    }
-  },
-
-  async testReminderSend(sourceType, sourceId, options = []) {
-    const config = (this.data.reminderConfig && this.data.reminderConfig[sourceType]) || {};
-    const templateId = String(config.templateId || '').trim();
-    const picked = await this.chooseReminderOption(options);
-    if (!picked) {
-      return;
-    }
-    const accepted = await this.requestTemplateConsent(templateId);
-    if (!accepted) {
-      wx.showToast({ title: '未授权微信提醒', icon: 'none' });
-      return;
-    }
-    try {
-      const { result } = await wx.cloud.callFunction({
-        name: 'adminAuth',
-        data: {
-          action: 'testSendReminderNotification',
-          sourceType,
-          sourceId,
-          reminderType: picked.value,
-        },
-      });
-      if (!(result && result.success)) {
-        throw new Error((result && result.error) || '测试发送失败');
-      }
-      wx.showToast({ title: '测试已发送', icon: 'success' });
-    } catch (error) {
-      showErrorToast(error, '测试发送失败');
-    }
-  },
-
   async subscribeBookkeepingReminder(e) {
     const id = String(e.currentTarget.dataset.id || '').trim();
     const options = (((this.data.reminderConfig || {}).bookkeeping || {}).options) || [];
     await this.requestReminderSubscribe('bookkeeping', id, options);
-  },
-
-  async testBookkeepingReminder(e) {
-    const id = String(e.currentTarget.dataset.id || '').trim();
-    const options = (((this.data.reminderConfig || {}).bookkeeping || {}).options) || [];
-    await this.testReminderSend('bookkeeping', id, options);
   },
 
   async loadViewerIdentity() {
@@ -280,7 +220,13 @@ Page({
     return (list || []).map((item) => ({
       ...item,
       createdAtText: formatTimeText(item.createdAt),
+      ...buildBookkeepingRelationText(item),
     }));
+  },
+
+  findBookkeepingItem(id) {
+    const docId = String(id || '').trim();
+    return (this.data.list || []).find((item) => String(item.id || item._id || '').trim() === docId) || null;
   },
 
   async loadList() {
@@ -406,6 +352,7 @@ Page({
   async editPromiseDate(e) {
     const id = e.currentTarget.dataset.id;
     if (!id) return;
+    const currentItem = this.findBookkeepingItem(id);
     const picked = await new Promise((resolve) => {
       wx.showActionSheet({
         itemList: ["今天", "明天", "后天", "手动输入"],
@@ -430,10 +377,10 @@ Page({
       promiseDate = toDateText(picked);
     } else {
       const res = await wx.showModal({
-        title: "修改承诺日期",
-        content: "请输入 YYYY-MM-DD",
+        title: `修改承诺日期（当前 ${String((currentItem && currentItem.promiseDate) || '未设置')}）`,
+        content: "",
         editable: true,
-        placeholderText: "2026-05-20",
+        placeholderText: "请输入 YYYY-MM-DD",
       });
       if (!res.confirm) return;
       promiseDate = String(res.content || "").trim();
@@ -461,18 +408,47 @@ Page({
     }
   },
 
-  async editPromiseAmount(e) {
+  async editAmounts(e) {
     const id = e.currentTarget.dataset.id;
     if (!id) return;
+    const currentItem = this.findBookkeepingItem(id);
+
+    const picked = await new Promise((resolve) => {
+      wx.showActionSheet({
+        itemList: ["改承诺金额", "改已还金额"],
+        success: (res) => resolve(res.tapIndex),
+        fail: () => resolve(-1),
+      });
+    });
+    if (picked < 0) return;
+
+    const isPromiseAmount = picked === 0;
+    const currentAmount = isPromiseAmount
+      ? formatMoney(currentItem && currentItem.promiseAmount)
+      : formatMoney(currentItem && currentItem.repaidAmount);
     const res = await wx.showModal({
-      title: "修改承诺金额",
-      content: "请输入金额",
+      title: isPromiseAmount
+        ? `修改承诺金额（当前 ¥${currentAmount}）`
+        : `修改已还金额（当前 ¥${currentAmount}）`,
+      content: "",
       editable: true,
-      placeholderText: "2800",
+      placeholderText: isPromiseAmount ? "请输入新的承诺金额" : "请输入新的已还金额",
     });
     if (!res.confirm) return;
-    const promiseAmount = formatMoney(res.content);
-    if (!promiseAmount) {
+
+    const inputText = String(res.content || '').trim();
+    if (!inputText) {
+      wx.showToast({ title: "请输入金额", icon: "none" });
+      return;
+    }
+
+    const amount = formatMoney(inputText);
+    if (amount < 0 || Number.isNaN(amount)) {
+      wx.showToast({ title: "金额无效", icon: "none" });
+      return;
+    }
+
+    if (isPromiseAmount && !amount) {
       wx.showToast({ title: "金额无效", icon: "none" });
       return;
     }
@@ -483,16 +459,22 @@ Page({
         data: {
           action: "updateSharedBookkeeping",
           id,
-          promiseAmount,
+          ...(isPromiseAmount ? { promiseAmount: amount } : { repaidAmount: amount }),
         },
       });
       if (!(result && result.success)) {
         throw new Error((result && result.error) || "修改失败");
       }
-      wx.showToast({ title: "已修改金额", icon: "success" });
+      wx.showToast({ title: isPromiseAmount ? "已修改金额" : "已修改已还金额", icon: "success" });
       this.clearUpcomingSummaryCache();
       await this.loadList();
     } catch (error) {
+      const errMsg = String((error && error.message) || '');
+      console.error('editAmounts error:', errMsg, error);
+      if (!isPromiseAmount && errMsg.includes('Nothing to update')) {
+        wx.showToast({ title: '请重新上传adminAuth云函数（检查部署状态）', icon: 'none' });
+        return;
+      }
       showErrorToast(error, "修改失败");
     }
   },
@@ -500,11 +482,14 @@ Page({
   async suggestPenalty(e) {
     const id = e.currentTarget.dataset.id;
     if (!id) return;
+    const currentItem = this.findBookkeepingItem(id);
     const res = await wx.showModal({
-      title: "新增惩罚措施",
-      content: "请输入惩罚措施",
+      title: currentItem && currentItem.penaltySuggestion
+        ? `修改惩罚措施（当前：${String(currentItem.penaltySuggestion).slice(0, 12)}${String(currentItem.penaltySuggestion).length > 12 ? '...' : ''}）`
+        : "新增惩罚措施",
+      content: "",
       editable: true,
-      placeholderText: "如 周末家务全包",
+      placeholderText: "请输入惩罚措施，如 周末家务全包",
     });
     if (!res.confirm) return;
     const suggestion = String(res.content || "").trim();

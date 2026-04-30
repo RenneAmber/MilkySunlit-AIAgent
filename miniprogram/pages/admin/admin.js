@@ -21,6 +21,11 @@ Page({
     detailLoadingId: '',
     deletingDiaryId: '',
     deletingChatLogId: '',
+    ragEvalLoading: false,
+    ragEvalSummary: null,
+    ragEvalDetails: [],
+    ragEvalError: '',
+    ragEvalRunAtText: '',
   },
 
   onLoad() {
@@ -200,6 +205,14 @@ Page({
     }
     const pad = (num) => String(num).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  },
+
+  formatPercent(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return '0.0%';
+    }
+    return `${(num * 100).toFixed(1)}%`;
   },
 
   maskMiddle(value, left = 6, right = 5) {
@@ -442,6 +455,68 @@ Page({
 
   refreshData() {
     this.verifyAndLoad();
+  },
+
+  async requestRagEvaluation(actionName = 'runRagEvaluation', successTitle = 'RAG评测完成', failTitle = 'RAG评测失败') {
+    if (this.data.ragEvalLoading) {
+      return;
+    }
+
+    this.setData({
+      ragEvalLoading: true,
+      ragEvalError: '',
+    });
+
+    try {
+      const { result } = await wx.cloud.callFunction({
+        name: 'adminAuth',
+        data: {
+          action: actionName,
+          limit: 8,
+        },
+      });
+
+      if (!result || !result.success) {
+        throw new Error((result && result.error) || '评测失败');
+      }
+
+      const summary = result.summary || null;
+      const details = (result.details || []).map((item) => ({
+        ...item,
+        recallText: this.formatPercent(item.recall),
+        avgScoreText: Number(item.avgScore || 0).toFixed(3),
+        latencyText: `${Number(item.latencyMs || 0)}ms`,
+        expectedText: Array.isArray(item.expectedKeywords) ? item.expectedKeywords.join('、') : '',
+        sourceText: Array.isArray(item.topSources) ? item.topSources.join('、') : '',
+        conflictCount: Array.isArray(item.conflicts) ? item.conflicts.length : 0,
+      }));
+
+      const summaryView = summary
+        ? {
+            ...summary,
+            avgRecallText: this.formatPercent(summary.avgRecall),
+            avgLatencyText: `${Number(summary.avgLatencyMs || 0)}ms`,
+          }
+        : null;
+
+      this.setData({
+        ragEvalLoading: false,
+        ragEvalSummary: summaryView,
+        ragEvalDetails: details,
+        ragEvalRunAtText: this.formatDateText(new Date()),
+      });
+      wx.showToast({ title: successTitle, icon: 'success' });
+    } catch (error) {
+      this.setData({
+        ragEvalLoading: false,
+        ragEvalError: (error && error.message) || '评测失败',
+      });
+      wx.showToast({ title: failTitle, icon: 'none' });
+    }
+  },
+
+  async runRagEvaluation() {
+    return this.requestRagEvaluation('runRagEvaluation', 'RAG评测完成', 'RAG评测失败');
   },
 
   goBack() {

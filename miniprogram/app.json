@@ -6,6 +6,7 @@
     "pages/bookkeeping/bookkeeping",
     "pages/recipes/recipes",
     "pages/love/love",
+    "pages/checklist/checklist",
     "pages/admin/admin",
     "pages/history-diary/history-diary"
   ],

@@ -55,6 +55,12 @@ Page({
     stepsText: "",
     link: "",
     note: "",
+    showAiPanel: false,
+    aiGenerating: false,
+    aiDescription: "",
+    aiImageLocalPath: "",
+    aiImageFileID: "",
+    aiResult: null, // { mode, generated:{name,ingredients,steps,note}, similar:{item,score} }
   },
 
   onShow() {
@@ -193,5 +199,132 @@ Page({
     } catch (error) {
       showErrorToast(error, "删除失败");
     }
+  },
+
+  // ========== AI 生成菜谱 ==========
+
+  openAiPanel() {
+    this.setData({
+      showAiPanel: true,
+      aiDescription: "",
+      aiImageLocalPath: "",
+      aiImageFileID: "",
+      aiResult: null,
+    });
+  },
+
+  closeAiPanel() {
+    this.setData({ showAiPanel: false });
+  },
+
+  onAiDescInput(e) {
+    this.setData({ aiDescription: e.detail.value });
+  },
+
+  async chooseAiImage() {
+    try {
+      const res = await wx.chooseMedia({
+        count: 1,
+        mediaType: ["image"],
+        sizeType: ["compressed"],
+        sourceType: ["album", "camera"],
+      });
+      const file = (res && res.tempFiles && res.tempFiles[0]) || null;
+      if (!file) return;
+      this.setData({ aiImageLocalPath: file.tempFilePath, aiImageFileID: "" });
+    } catch (error) {
+      // user cancel
+    }
+  },
+
+  removeAiImage() {
+    this.setData({ aiImageLocalPath: "", aiImageFileID: "" });
+  },
+
+  async uploadAiImageIfNeeded() {
+    const localPath = this.data.aiImageLocalPath;
+    if (!localPath) return "";
+    if (this.data.aiImageFileID) return this.data.aiImageFileID;
+    const ext = (localPath.match(/\.(jpg|jpeg|png|webp|gif)$/i) || [, "jpg"])[1].toLowerCase();
+    const cloudPath = `recipe-ai/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const res = await wx.cloud.uploadFile({ cloudPath, filePath: localPath });
+    const fileID = String((res && res.fileID) || "");
+    if (fileID) this.setData({ aiImageFileID: fileID });
+    return fileID;
+  },
+
+  async generateAiRecipe() {
+    const description = String(this.data.aiDescription || "").trim();
+    if (!description && !this.data.aiImageLocalPath) {
+      wx.showToast({ title: "请填写描述或选择图片", icon: "none" });
+      return;
+    }
+    if (this.data.aiGenerating) return;
+    this.setData({ aiGenerating: true, aiResult: null });
+    try {
+      const imageFileID = await this.uploadAiImageIfNeeded();
+      const { result } = await wx.cloud.callFunction({
+        name: "adminAuth",
+        data: {
+          action: "generateRecipeFromInput",
+          description,
+          imageFileID,
+        },
+      });
+      if (!(result && result.success) || !result.data) {
+        throw new Error((result && result.error) || "生成失败");
+      }
+      const data = result.data;
+      const decorated = {
+        mode: data.mode,
+        generated: {
+          ...data.generated,
+          ingredientsDisplay: (data.generated.ingredients || []).join("、"),
+        },
+        similar: data.similar
+          ? {
+              score: data.similar.score,
+              scorePercent: Math.round(Number(data.similar.score || 0) * 100),
+              item: normalizeRecipeItem(data.similar.item || {}),
+            }
+          : null,
+      };
+      this.setData({ aiResult: decorated });
+    } catch (error) {
+      showErrorToast(error, "生成失败");
+    } finally {
+      this.setData({ aiGenerating: false });
+    }
+  },
+
+  viewSimilarRecipe() {
+    this.setData({ showAiPanel: false });
+    const item = this.data.aiResult && this.data.aiResult.similar && this.data.aiResult.similar.item;
+    if (!item) return;
+    const keyword = String(item.name || "").trim();
+    if (keyword) {
+      this.setData({ keyword });
+      this.loadList();
+    }
+  },
+
+  useAiGenerated() {
+    const generated = this.data.aiResult && this.data.aiResult.generated;
+    if (!generated) return;
+    this.setData({
+      showAiPanel: false,
+      showAddForm: true,
+      editingId: "",
+      name: generated.name || "",
+      ingredientsText: (generated.ingredients || []).join("\n"),
+      stepsText: (generated.steps || []).join("\n"),
+      link: "",
+      note: generated.note || "",
+    });
+  },
+
+  regenerateAiRecipe() {
+    this.setData({ aiResult: null });
+    this.generateAiRecipe();
   },
 });

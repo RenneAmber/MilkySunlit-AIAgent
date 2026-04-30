@@ -377,6 +377,9 @@ Component({
         return {
           list: [],
           prompt: "",
+          metrics: {},
+          rewrittenQuery: "",
+          conflicts: [],
         };
       }
 
@@ -397,13 +400,94 @@ Component({
         return {
           list: ragList,
           prompt: this.buildRagContextPrompt(ragList),
+          metrics: (result && result.metrics) || {},
+          rewrittenQuery: (result && result.rewrittenQuery) || normalizedQuery,
+          conflicts: (result && result.conflicts) || [],
         };
       } catch (error) {
         return {
           list: [],
           prompt: "",
+          metrics: {},
+          rewrittenQuery: normalizedQuery,
+          conflicts: [],
         };
       }
+    },
+    trimPromptByBudget: function (text = "", maxChars = 1800) {
+      const normalized = String(text || "").trim();
+      if (!normalized) {
+        return "";
+      }
+      if (normalized.length <= maxChars) {
+        return normalized;
+      }
+      return `${normalized.slice(0, Math.max(0, maxChars - 1))}…`;
+    },
+    buildBudgetedSystemMessages: function (layers = [], maxChars = 5200) {
+      const sorted = (Array.isArray(layers) ? layers : [])
+        .filter((item) => item && item.role && item.content)
+        .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0));
+
+      const result = [];
+      let consumed = 0;
+      for (const layer of sorted) {
+        if (consumed >= maxChars) {
+          break;
+        }
+        const remain = maxChars - consumed;
+        const piece = this.trimPromptByBudget(layer.content, Math.max(120, remain));
+        if (!piece) {
+          continue;
+        }
+        result.push({
+          role: layer.role,
+          content: piece,
+        });
+        consumed += piece.length;
+      }
+      return result;
+    },
+    buildFocusedLocalFactsPrompt: function (localFactsPrompt = "", inputValue = "", nameList = []) {
+      const prompt = String(localFactsPrompt || "").trim();
+      if (!prompt) {
+        return "";
+      }
+
+      const normalizedInput = String(inputValue || "");
+      const matchedNames = (Array.isArray(nameList) ? nameList : [])
+        .map((name) => String(name || "").trim())
+        .filter(Boolean)
+        .filter((name) => normalizedInput.includes(name));
+
+      if (!matchedNames.length) {
+        return "";
+      }
+
+      const lines = prompt.split("\n").map((line) => String(line || "").trim()).filter(Boolean);
+      if (!lines.length) {
+        return "";
+      }
+
+      const staticRules = lines.filter((line) => (
+        line.startsWith("以下人物设定属于")
+        || line.startsWith("家庭关系：")
+        || line.startsWith("当用户问年龄")
+      ));
+
+      const matchedLines = lines.filter((line) => matchedNames.some((name) => line.includes(name)));
+      const merged = [...staticRules, ...matchedLines];
+      const deduped = [];
+      const seen = new Set();
+      merged.forEach((line) => {
+        if (!line || seen.has(line)) {
+          return;
+        }
+        seen.add(line);
+        deduped.push(line);
+      });
+
+      return deduped.join("\n");
     },
     getTodayDateText: function () {
       const now = new Date();
@@ -2451,6 +2535,12 @@ Component({
             requestEndedAt: payload.requestEndedAt ? new Date(payload.requestEndedAt) : new Date(),
             answerLength: String(payload.answer || "").length,
             questionLength: String(payload.question || "").length,
+            ragCandidateCount: Number(payload.ragCandidateCount) || 0,
+            ragSelectedCount: Number(payload.ragSelectedCount) || 0,
+            ragAvgScore: Number(payload.ragAvgScore) || 0,
+            ragLatencyMs: Number(payload.ragLatencyMs) || 0,
+            ragRewrittenQuery: String(payload.ragRewrittenQuery || ""),
+            ragConflicts: Array.isArray(payload.ragConflicts) ? payload.ragConflicts : [],
             createdAt: new Date(),
           },
         });
@@ -3311,6 +3401,10 @@ Component({
           qaLogCollection,
         } = modelConfig;
 
+        const nameList = Array.isArray(strictLocalNames) ? strictLocalNames : [];
+        const containsLocalName = nameList.some((name) => inputValue.includes(name));
+        const focusedLocalFactsPrompt = this.buildFocusedLocalFactsPrompt(localFactsPrompt, inputValue, nameList);
+
         const now = Date.now();
         const hasFreshSharedMemory =
           !!this.data.sharedMemoryPrompt &&
@@ -3330,11 +3424,12 @@ Component({
         const ragContext = await this.awaitWithTimeout(this.retrieveRagContext(inputValue, 8), 2500, "知识检索超时")
           .catch(() => ({ list: [], prompt: "" }));
         const ragContextPrompt = String((ragContext && ragContext.prompt) || "").trim();
+        const ragMetrics = (ragContext && ragContext.metrics) || {};
+        const ragRewrittenQuery = String((ragContext && ragContext.rewrittenQuery) || "");
+        const ragConflicts = (ragContext && ragContext.conflicts) || [];
 
         if (modelProvider === "openai" && endpointBase && apiKey) {
           try {
-            const nameList = Array.isArray(strictLocalNames) ? strictLocalNames : [];
-            const containsLocalName = nameList.some((name) => inputValue.includes(name));
             const localMemoryPrompt = this.buildLocalMemoryPrompt();
             const strictLocalGuard = containsLocalName
               ? [
@@ -3347,7 +3442,7 @@ Component({
                     ? [
                         {
                           role: "system",
-                          content: localFactsPrompt,
+                          content: focusedLocalFactsPrompt || localFactsPrompt,
                         },
                       ]
                     : []),
@@ -3384,6 +3479,12 @@ Component({
                 durationMs: Date.now() - requestStartedAt,
                 requestStartedAt,
                 requestEndedAt: Date.now(),
+                ragCandidateCount: Number(ragMetrics.candidateCount || 0),
+                ragSelectedCount: Number(ragMetrics.selectedCount || 0),
+                ragAvgScore: Number(ragMetrics.avgScore || 0),
+                ragLatencyMs: Number(ragMetrics.latencyMs || 0),
+                ragRewrittenQuery,
+                ragConflicts,
               });
               return;
             }
@@ -3430,13 +3531,14 @@ Component({
               }),
             };
 
-            const systemMessages = [
-              ...strictLocalGuard,
+            const layeredSystemMessages = [
+              ...strictLocalGuard.map((item) => ({ ...item, priority: 100 })),
               ...(localMemoryPrompt
                 ? [
                     {
                       role: "system",
                       content: localMemoryPrompt,
+                      priority: 80,
                     },
                   ]
                 : []),
@@ -3445,6 +3547,7 @@ Component({
                     {
                       role: "system",
                       content: mergedMemoryPrompt,
+                      priority: 70,
                     },
                   ]
                 : []),
@@ -3453,15 +3556,16 @@ Component({
                     {
                       role: "system",
                       content: ragContextPrompt,
+                      priority: 90,
                     },
                   ]
                 : []),
-              // 仅在命中对应工具意图时注入提示，避免普通消息多消耗 token
-              ...(needsCalendarTool ? [calendarToolSystemPrompt] : []),
-              ...(needsBookkeepingTool ? [bookkeepingToolSystemPrompt] : []),
-              ...(needsRecipeTool ? [recipeToolSystemPrompt] : []),
-              ...(needsStructuredDecision ? [calendarToolContext] : []),
+              ...(needsCalendarTool ? [{ ...calendarToolSystemPrompt, priority: 60 }] : []),
+              ...(needsBookkeepingTool ? [{ ...bookkeepingToolSystemPrompt, priority: 60 }] : []),
+              ...(needsRecipeTool ? [{ ...recipeToolSystemPrompt, priority: 60 }] : []),
+              ...(needsStructuredDecision ? [{ ...calendarToolContext, priority: 60 }] : []),
             ];
+            const systemMessages = this.buildBudgetedSystemMessages(layeredSystemMessages, 5600);
 
             const recentConversationMessages = [
               ...chatRecords.map((item) => ({
@@ -3665,6 +3769,12 @@ Component({
               durationMs: Date.now() - requestStartedAt,
               requestStartedAt,
               requestEndedAt: Date.now(),
+              ragCandidateCount: Number(ragMetrics.candidateCount || 0),
+              ragSelectedCount: Number(ragMetrics.selectedCount || 0),
+              ragAvgScore: Number(ragMetrics.avgScore || 0),
+              ragLatencyMs: Number(ragMetrics.latencyMs || 0),
+              ragRewrittenQuery,
+              ragConflicts,
             });
           } catch (error) {
             const newValue = [...this.data.chatRecords];
@@ -3696,18 +3806,25 @@ Component({
               durationMs: Date.now() - requestStartedAt,
               requestStartedAt,
               requestEndedAt: Date.now(),
+              ragCandidateCount: Number(ragMetrics.candidateCount || 0),
+              ragSelectedCount: Number(ragMetrics.selectedCount || 0),
+              ragAvgScore: Number(ragMetrics.avgScore || 0),
+              ragLatencyMs: Number(ragMetrics.latencyMs || 0),
+              ragRewrittenQuery,
+              ragConflicts,
             });
           }
           return;
         }
         const cloudInstance = await getCloudInstance(this.data.envShareConfig);
         const ai = cloudInstance.extend.AI;
-        const baseMessages = [
-          ...(localFactsPrompt
+        const baseSystemLayers = [
+          ...((focusedLocalFactsPrompt || localFactsPrompt)
             ? [
                 {
                   role: "system",
-                  content: localFactsPrompt,
+                  content: focusedLocalFactsPrompt || localFactsPrompt,
+                  priority: 100,
                 },
               ]
             : []),
@@ -3716,6 +3833,7 @@ Component({
                 {
                   role: "system",
                   content: ragContextPrompt,
+                  priority: 90,
                 },
               ]
             : []),
@@ -3724,9 +3842,14 @@ Component({
                 {
                   role: "system",
                   content: mergedMemoryPrompt,
+                  priority: 70,
                 },
               ]
             : []),
+        ];
+
+        const baseMessages = [
+          ...this.buildBudgetedSystemMessages(baseSystemLayers, 5000),
           ...chatRecords.map((item) => ({
             role: item.role,
             content: item.content,

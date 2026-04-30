@@ -20,6 +20,7 @@ const DIARY_SYNC_TTL = 3600000; // 1 小时（ms）
 // onShow 时若 memory prompt 未过期则跳过重新拉取，避免每次切回都触发云端请求
 const MEMORY_PROMPT_REFRESH_KEY = "chatbot_memory_prompt_refreshed_at";
 const MEMORY_PROMPT_TTL = 300000; // 5 分钟（ms）
+const CHAT_MEMORY_LIMIT = 40;
 const ADMIN_OPENIDS = ["o1vza4lDAMQeVaoL2xdW4E_xmJCs"];
 
 function normalizePrivacyLevel(value) {
@@ -202,6 +203,7 @@ Page({
         .collection("chat_memory")
         .where({ enabled: true })
         .orderBy("order", "asc")
+        .limit(CHAT_MEMORY_LIMIT)
         .get();
       const baseItems = (chatMemoryRes.data || [])
         .filter((item) => item && item.content)

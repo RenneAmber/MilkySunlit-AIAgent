@@ -41,9 +41,10 @@
 
     <view class="item" wx:for="{{list}}" wx:key="id">
       <view class="item-title">{{item.purchaseItem}}</view>
-      <view class="item-line">{{item.fromName}} → {{item.toName}}，转账 ¥{{item.transferAmount}}</view>
+      <view class="item-line">{{item.lendingText}}</view>
       <view class="item-line">创建于 {{item.createdAtText}}</view>
       <view class="item-line">承诺 {{item.promiseDate}} 归还 ¥{{item.promiseAmount}}</view>
+      <view class="item-line">{{item.debtText}}</view>
       <view class="item-line">已还 ¥{{item.repaidAmount}}，还欠 ¥{{item.outstandingAmount}} <text wx:if="{{item.overdue}}" class="warn">（已超期）</text></view>
       <view class="penalty-box" wx:if="{{item.penaltySuggestion || (item.overdue && item.outstandingAmount > 0)}}">
         <view class="item-line">惩罚状态：
@@ -63,9 +64,8 @@
       </view>
       <view class="btn-row">
         <button size="mini" bindtap="subscribeBookkeepingReminder" data-id="{{item.id}}">{{bookkeepingSubscribedMap[item.id] ? '已订阅' : '订阅提醒'}}</button>
-        <button size="mini" bindtap="testBookkeepingReminder" data-id="{{item.id}}">测试发送</button>
         <button size="mini" bindtap="editPromiseDate" data-id="{{item.id}}">改日期</button>
-        <button size="mini" bindtap="editPromiseAmount" data-id="{{item.id}}">改金额</button>
+        <button size="mini" bindtap="editAmounts" data-id="{{item.id}}">改金额/已还</button>
         <button wx:if="{{item.isOwner}}" size="mini" type="warn" bindtap="deleteItem" data-id="{{item.id}}">删除</button>
       </view>
     </view>

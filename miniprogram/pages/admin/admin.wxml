@@ -29,7 +29,30 @@
       </view>
       <view class="btn-row">
         <view class="btn" bind:tap="refreshData">刷新数据</view>
+        <view class="btn" bind:tap="runRagEvaluation">{{ragEvalLoading ? '评测中...' : 'RAG评测'}}</view>
         <view class="btn btn-light" bind:tap="goBack">返回首页</view>
+      </view>
+    </view>
+
+    <view class="list-box">
+      <view class="list-title">RAG评测结果</view>
+      <view class="empty" wx:if="{{!ragEvalSummary && !ragEvalLoading && !ragEvalError}}">点击上方“RAG评测”开始评测</view>
+      <view class="error-hint" wx:if="{{ragEvalError}}">{{ragEvalError}}</view>
+      <view class="rag-summary" wx:if="{{ragEvalSummary}}">
+        <view class="rag-line">评测条数：{{ragEvalSummary.totalQueries}}</view>
+        <view class="rag-line">平均召回：{{ragEvalSummary.avgRecallText}}</view>
+        <view class="rag-line">平均延迟：{{ragEvalSummary.avgLatencyText}}</view>
+        <view class="rag-line">通过条数：{{ragEvalSummary.passedQueries}}</view>
+        <view class="rag-line" wx:if="{{ragEvalRunAtText}}">最近评测：{{ragEvalRunAtText}}</view>
+      </view>
+
+      <view class="rag-card" wx:for="{{ragEvalDetails}}" wx:key="query">
+        <view class="rag-q">Q：{{item.query}}</view>
+        <view class="rag-meta">召回：{{item.recallText}} | 用时：{{item.latencyText}} | 平均分：{{item.avgScoreText}}</view>
+        <view class="rag-meta">改写：{{item.rewrittenQuery}}</view>
+        <view class="rag-meta">期望关键词：{{item.expectedText || '无'}}</view>
+        <view class="rag-meta">来源分布：{{item.sourceText || '无'}}</view>
+        <view class="rag-meta">冲突条数：{{item.conflictCount}}</view>
       </view>
     </view>
 

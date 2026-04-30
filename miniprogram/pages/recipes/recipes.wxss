@@ -129,6 +129,133 @@
   flex: 1;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+}
+
+.ai-btn {
+  background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%) !important;
+  color: #fff !important;
+}
+
+.ai-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(12, 18, 45, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 999;
+}
+
+.ai-panel {
+  width: 100%;
+  max-height: 86vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.ai-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.ai-header .title {
+  margin-bottom: 0;
+}
+
+.close-btn {
+  font-size: 36rpx;
+  color: #8791b3;
+  padding: 6rpx 14rpx;
+}
+
+.image-picker {
+  border: 1px dashed #d7ddf6;
+  border-radius: 14rpx;
+  background: #f9faff;
+  height: 160rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5e6dff;
+  font-size: 28rpx;
+}
+
+.image-preview-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.image-preview {
+  width: 260rpx;
+  height: 260rpx;
+  border-radius: 14rpx;
+  object-fit: cover;
+}
+
+.image-remove {
+  position: absolute;
+  top: 8rpx;
+  right: 8rpx;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 22rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+}
+
+.ai-result {
+  margin-top: 8rpx;
+}
+
+.match-tag {
+  display: inline-block;
+  background: #fff4e5;
+  color: #d97706;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  margin-bottom: 14rpx;
+}
+
+.match-tag.new-tag {
+  background: #eaf7ee;
+  color: #20a779;
+}
+
+.ai-recipe-card {
+  background: #fbfcff;
+  border: 1px solid #e5e9ff;
+  border-radius: 14rpx;
+  padding: 18rpx;
+  margin-bottom: 16rpx;
+}
+
+.ai-recipe-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #253162;
+  margin-bottom: 8rpx;
+}
+
+.ai-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+
 .add-btn {
   display: inline-flex;
   align-items: center;

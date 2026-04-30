@@ -1,0 +1,77 @@
+<view class="page">
+  <view class="card form-card">
+    <view class="title">新建清单</view>
+    <view class="form-row">
+      <text class="label">标题</text>
+      <input class="input" value="{{newTitle}}" bindinput="onInputNewTitle" placeholder="如 去新西兰旅游前准备" maxlength="60" />
+    </view>
+    <view class="form-row">
+      <text class="label">预期完成时间</text>
+      <picker mode="date" bindchange="onNewDateChange">
+        <view class="picker">{{newExpectedDate || '请选择日期（可选）'}}</view>
+      </picker>
+    </view>
+    <button class="primary" loading="{{adding}}" bindtap="createChecklist">创建清单</button>
+  </view>
+
+  <view class="loading" wx:if="{{loading}}">加载中...</view>
+  <view class="empty" wx:if="{{!loading && !list.length}}">暂无清单，快来创建一个吧～</view>
+
+  <view class="card checklist-card" wx:for="{{list}}" wx:for-item="checklist" wx:key="id">
+    <view class="checklist-header">
+      <view class="checklist-title-row" bindtap="toggleExpand" data-id="{{checklist.id}}">
+        <view class="checklist-title {{checklist.allDone ? 'all-done' : ''}}">
+          {{checklist.title}}
+          <text class="owner-tag" wx:if="{{checklist.ownerLabel}}">· {{checklist.ownerLabel}}</text>
+        </view>
+        <view class="expand-icon">{{checklist.expanded ? '▲' : '▼'}}</view>
+      </view>
+      <view class="checklist-meta">
+        <picker mode="date" bindchange="editChecklistDate" data-id="{{checklist.id}}" value="{{checklist.expectedDate}}">
+          <view class="date-chip">📅 {{checklist.expectedDate || '未设置'}}</view>
+        </picker>
+        <view class="meta-actions">
+          <view class="edit-btn" catchtap="editChecklistTitle" data-id="{{checklist.id}}">改名</view>
+          <view wx:if="{{checklist.isOwner}}" class="delete-btn" catchtap="deleteChecklist" data-id="{{checklist.id}}">删除清单</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="progress-row">
+      <view class="progress-bar"><view class="progress-inner" style="width:{{checklist.progressPercent}}%"></view></view>
+      <text class="progress-text">{{checklist.progressText}}</text>
+    </view>
+
+    <block wx:if="{{checklist.expanded}}">
+      <view class="toolbar" wx:if="{{checklist.itemCount > 0}}">
+        <view class="toggle-show-done" bindtap="toggleShowDone" data-id="{{checklist.id}}">
+          {{checklist.showDone ? '隐藏已完成' : '显示已完成' + (checklist.hiddenDoneCount > 0 ? '（' + checklist.hiddenDoneCount + '）' : '')}}
+        </view>
+      </view>
+
+      <view class="items">
+        <view class="item {{item.done ? 'item-done' : ''}}" wx:for="{{checklist.visibleItems}}" wx:for-item="item" wx:key="id">
+          <view class="item-main">
+            <view class="checkbox {{item.done ? 'checked' : ''}}" bindtap="toggleItemDone" data-id="{{checklist.id}}" data-item-id="{{item.id}}">
+              <text wx:if="{{item.done}}">✓</text>
+            </view>
+            <view class="item-body">
+              <view class="item-content" bindtap="editItemContent" data-id="{{checklist.id}}" data-item-id="{{item.id}}">{{item.content}}</view>
+              <view class="item-blocker" bindtap="editItemBlocker" data-id="{{checklist.id}}" data-item-id="{{item.id}}">
+                <text wx:if="{{item.blocker}}">🚧 {{item.blocker}}</text>
+                <text wx:else class="blocker-placeholder">点击添加限制 / 购买地点</text>
+              </view>
+            </view>
+            <view class="item-delete" bindtap="deleteItem" data-id="{{checklist.id}}" data-item-id="{{item.id}}">✕</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="add-item-row">
+        <input class="input item-input" value="{{itemDrafts[checklist.id].content}}" bindinput="onDraftContentInput" data-id="{{checklist.id}}" placeholder="要完成的事项，如 办理nZETA认证" maxlength="100" />
+        <input class="input item-input" value="{{itemDrafts[checklist.id].blocker}}" bindinput="onDraftBlockerInput" data-id="{{checklist.id}}" placeholder="卡在哪 / 去哪里买（可为空）" maxlength="100" />
+        <button class="secondary" bindtap="addItem" data-id="{{checklist.id}}">+ 添加事项</button>
+      </view>
+    </block>
+  </view>
+</view>

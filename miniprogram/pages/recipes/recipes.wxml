@@ -35,7 +35,10 @@
     <view class="card list-card">
       <view class="header-row">
         <view class="title">菜谱列表</view>
-        <view class="add-btn" bind:tap="startAddRecipe">＋ 添加菜谱</view>
+        <view class="header-actions">
+          <view class="add-btn ai-btn" bind:tap="openAiPanel">✨ AI 生成</view>
+          <view class="add-btn" bind:tap="startAddRecipe">＋ 添加菜谱</view>
+        </view>
       </view>
       <view class="search-row">
         <input class="input search-input" value="{{keyword}}" data-field="keyword" bindinput="onInput" placeholder="名称 / 食材" />
@@ -59,4 +62,66 @@
       </view>
     </view>
   </view>
+
+  <!-- AI 生成菜谱面板 -->
+  <view wx:if="{{showAiPanel}}" class="ai-mask" catchtap="closeAiPanel">
+    <view class="ai-panel" catchtap="">
+      <view class="ai-header">
+        <view class="title">✨ AI 一键生成菜谱</view>
+        <view class="close-btn" bindtap="closeAiPanel">✕</view>
+      </view>
+
+      <view wx:if="{{!aiResult}}">
+        <view class="form-row">
+          <text class="label">菜品描述（可选，但更准确）</text>
+          <textarea class="textarea" value="{{aiDescription}}" bindinput="onAiDescInput" placeholder="例如：清炒西兰花，不辣，家常做法" maxlength="400" />
+        </view>
+        <view class="form-row">
+          <text class="label">菜品图片（可选）</text>
+          <view wx:if="{{!aiImageLocalPath}}" class="image-picker" bindtap="chooseAiImage">📷 选择图片</view>
+          <view wx:else class="image-preview-wrap">
+            <image class="image-preview" src="{{aiImageLocalPath}}" mode="aspectFill" bindtap="chooseAiImage" />
+            <view class="image-remove" bindtap="removeAiImage">移除</view>
+          </view>
+        </view>
+        <button class="primary" loading="{{aiGenerating}}" bindtap="generateAiRecipe">{{aiGenerating ? '生成中...' : '开始生成'}}</button>
+      </view>
+
+      <view wx:else>
+        <!-- 命中相似菜谱 -->
+        <view wx:if="{{aiResult.mode === 'matched' && aiResult.similar}}" class="ai-result">
+          <view class="match-tag">📚 已有相似菜谱（相似度 {{aiResult.similar.scorePercent}}%）</view>
+          <view class="ai-recipe-card">
+            <view class="ai-recipe-name">{{aiResult.similar.item.name}}</view>
+            <view class="item-line">食材：{{aiResult.similar.item.ingredientsDisplay || '暂无'}}</view>
+            <view class="item-line">步骤：</view>
+            <view class="step" wx:for="{{aiResult.similar.item.stepsDisplay}}" wx:key="index" wx:for-item="stepText">{{index + 1}}. {{stepText}}</view>
+            <view class="item-line" wx:if="{{aiResult.similar.item.note}}">备注：{{aiResult.similar.item.note}}</view>
+          </view>
+          <view class="ai-actions">
+            <button class="primary" bindtap="viewSimilarRecipe">直接查看已有的</button>
+            <button bindtap="useAiGenerated">仍用 AI 新版本</button>
+            <button size="mini" bindtap="regenerateAiRecipe">重新生成</button>
+          </view>
+        </view>
+
+        <!-- 全新生成 -->
+        <view wx:else class="ai-result">
+          <view class="match-tag new-tag">🆕 AI 为你生成了新菜谱</view>
+          <view class="ai-recipe-card">
+            <view class="ai-recipe-name">{{aiResult.generated.name}}</view>
+            <view class="item-line">食材：{{aiResult.generated.ingredientsDisplay}}</view>
+            <view class="item-line">步骤：</view>
+            <view class="step" wx:for="{{aiResult.generated.steps}}" wx:key="index" wx:for-item="stepText">{{index + 1}}. {{stepText}}</view>
+            <view class="item-line" wx:if="{{aiResult.generated.note}}">小贴士：{{aiResult.generated.note}}</view>
+          </view>
+          <view class="ai-actions">
+            <button class="primary" bindtap="useAiGenerated">保存为菜谱</button>
+            <button size="mini" bindtap="regenerateAiRecipe">重新生成</button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
 </view>
+

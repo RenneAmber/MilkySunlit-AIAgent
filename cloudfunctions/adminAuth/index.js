@@ -49,11 +49,29 @@ const DEFAULT_CALENDAR_LIMIT = 80;
 const DEFAULT_SHARED_MEMORY_LIMIT = 30;
 const DEFAULT_RAG_RESULT_LIMIT = 8;
 const MAX_RAG_CANDIDATE_LIMIT = 120;
+const RAG_OBSERVABILITY_COLLECTION = 'rag_observability';
+const MEMORY_CONFLICT_WINDOW_SIZE = 80;
+const RAG_EVAL_QUERIES = [
+  { query: '山雪是谁', expectedKeywords: ['山雪', '默沙东', '曹杨二中'] },
+  { query: '王晓莉和孙励天什么关系', expectedKeywords: ['王晓莉', '高中同学', '曹杨二中'] },
+  { query: '山雪口中的群指谁', expectedKeywords: ['山雪', '王晓莉', '秦天', '孙励天'] },
+  { query: '秦天近况', expectedKeywords: ['秦天', '华尔街', '博士'] },
+];
 const SHARED_CALENDAR_COLLECTION = 'shared_calendar';
 const SHARED_CONCEPT_MEMORY_COLLECTION = 'shared_concept_memory';
 const SHARED_BOOKKEEPING_COLLECTION = 'shared_bookkeeping';
 const SHARED_RECIPE_COLLECTION = 'shared_recipe';
 const SHARED_REMINDER_SUBSCRIPTION_COLLECTION = 'shared_reminder_subscription';
+const SHARED_CHECKLIST_COLLECTION = 'shared_checklist';
+
+const AZURE_OPENAI_CONFIG = {
+  endpointBase: 'https://milkysunlit.openai.azure.com',
+  apiKey: '236d2d85c3ce4b5d9fbf5517df1c5e6f',
+  deployment: 'gpt-5.4-mini',
+  apiVersion: '2025-01-01-preview',
+};
+
+const RECIPE_SIMILARITY_THRESHOLD = 0.55;
 
 const RELATIONSHIP_ANNIVERSARIES = [
   { id: 'song-birthday', name: '宋陶颖生日', monthDay: '11-25', dateText: '11.25', type: 'birthday', owner: '宋陶颖' },
@@ -202,7 +220,225 @@ function normalizeSharedMemoryContent(content) {
   if (!text) {
     return '';
   }
-  return text.slice(0, 300);
+  return text
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[。！？!?,，；;]+$/g, '')
+    .slice(0, 300);
+}
+
+function normalizeMemoryFingerprint(content = '') {
+  return String(content || '')
+    .toLowerCase()
+    .replace(/[\s，,。.!！？；;:：'"“”‘’()（）\[\]{}]/g, '')
+    .trim();
+}
+
+function rewriteRagQuery(query = '') {
+  const normalized = normalizeRagQuery(query);
+  if (!normalized) {
+    return {
+      originalQuery: '',
+      rewrittenQuery: '',
+      expandedTerms: [],
+    };
+  }
+
+  const termMap = {
+    群: ['群体', '同学群', '四人', '朋友'],
+    口中的群: ['群体', '同学群', '四人'],
+    近况: ['最近', '现在', '目前', '现状'],
+    关系: ['同学', '朋友', '关联'],
+    哪个学校: ['学校', '本科', '高中'],
+    学校: ['本科', '高中', '大学'],
+    同学: ['高中同学', '校友'],
+  };
+
+  const expanded = [];
+  Object.entries(termMap).forEach(([key, values]) => {
+    if (normalized.includes(key)) {
+      expanded.push(...values);
+    }
+  });
+
+  Object.values(USER_IDENTITY_MAP).forEach((identity) => {
+    const personName = String((identity && identity.personName) || '').trim();
+    if (personName && normalized.includes(personName)) {
+      expanded.push(personName);
+    }
+  });
+
+  const expandedTerms = Array.from(new Set(expanded.filter(Boolean))).slice(0, 12);
+  const rewrittenQuery = [normalized, ...expandedTerms].join(' ').trim();
+  return {
+    originalQuery: normalized,
+    rewrittenQuery,
+    expandedTerms,
+  };
+}
+
+function buildSparseVector(tokens = []) {
+  const vector = Object.create(null);
+  (tokens || []).forEach((token) => {
+    const key = String(token || '').trim();
+    if (!key) {
+      return;
+    }
+    vector[key] = (vector[key] || 0) + 1;
+  });
+  return vector;
+}
+
+function cosineSimilaritySparse(vecA = {}, vecB = {}) {
+  const keysA = Object.keys(vecA);
+  const keysB = Object.keys(vecB);
+  if (!keysA.length || !keysB.length) {
+    return 0;
+  }
+
+  let dot = 0;
+  keysA.forEach((key) => {
+    if (vecB[key]) {
+      dot += vecA[key] * vecB[key];
+    }
+  });
+  const normA = Math.sqrt(keysA.reduce((sum, key) => sum + vecA[key] * vecA[key], 0));
+  const normB = Math.sqrt(keysB.reduce((sum, key) => sum + vecB[key] * vecB[key], 0));
+  if (!normA || !normB) {
+    return 0;
+  }
+  return dot / (normA * normB);
+}
+
+function scoreRagCandidateHybrid(queryInfo = {}, candidate = {}) {
+  const queryText = String(queryInfo.rewrittenQuery || '').trim();
+  const queryTokens = buildRagTokens(queryText);
+  const content = String(candidate.content || '').trim();
+  if (!queryText || !content) {
+    return {
+      lexicalScore: 0,
+      semanticScore: 0,
+      recencyScore: 0,
+      totalScore: 0,
+    };
+  }
+
+  const candidateTokens = buildRagTokens(`${candidate.title || ''} ${content} ${candidate.userLabel || ''}`);
+  const querySet = new Set(queryTokens);
+  const overlap = candidateTokens.filter((token) => querySet.has(token)).length;
+  const lexicalScore = overlap ? overlap * 2 + overlap / Math.max(1, querySet.size) * 2 : 0;
+
+  const queryVec = buildSparseVector(queryTokens);
+  const candidateVec = buildSparseVector(candidateTokens);
+  const semanticScore = cosineSimilaritySparse(queryVec, candidateVec) * 6;
+
+  const createdAtMs = toTimeMs(candidate.createdAt);
+  const ageDays = createdAtMs ? Math.max(0, (Date.now() - createdAtMs) / (24 * 60 * 60 * 1000)) : 365;
+  const recencyScore = Math.max(0, 1 - ageDays / 90);
+  const sourceBoost = candidate.source === 'chatMemory' ? 0.5 : candidate.source === 'sharedConcept' ? 0.3 : 0.1;
+  const importantBoost = candidate.important ? 0.4 : 0;
+  const fullTextBoost = content.includes(String(queryInfo.originalQuery || '').trim()) ? 1.2 : 0;
+
+  const totalScore = lexicalScore + semanticScore + recencyScore + sourceBoost + importantBoost + fullTextBoost;
+  return {
+    lexicalScore: Number(lexicalScore.toFixed(3)),
+    semanticScore: Number(semanticScore.toFixed(3)),
+    recencyScore: Number(recencyScore.toFixed(3)),
+    totalScore: Number(totalScore.toFixed(3)),
+  };
+}
+
+function detectRagConflicts(ranked = []) {
+  const conflicts = [];
+  const seenBySubject = new Map();
+
+  ranked.forEach((item) => {
+    const content = String(item.content || '').trim();
+    const subjectMatch = content.match(/^([\u4e00-\u9fffA-Za-z0-9]{1,12})(是|在|为|口中的|关系)/);
+    const subject = subjectMatch ? subjectMatch[1] : '';
+    if (!subject) {
+      return;
+    }
+    const normalized = normalizeMemoryFingerprint(content);
+    const isNegative = /(不是|并非|没有|无)/.test(content);
+    const prev = seenBySubject.get(subject);
+    if (prev && prev.isNegative !== isNegative && prev.normalized !== normalized) {
+      conflicts.push({
+        subject,
+        left: prev.content,
+        right: content,
+      });
+      return;
+    }
+    if (!prev) {
+      seenBySubject.set(subject, { content, normalized, isNegative });
+    }
+  });
+
+  return conflicts.slice(0, 6);
+}
+
+function rerankRagCandidates(candidates = [], limit = DEFAULT_RAG_RESULT_LIMIT) {
+  const sorted = [...candidates].sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+    return toTimeMs(b.createdAt) - toTimeMs(a.createdAt);
+  });
+
+  const selected = [];
+  const sourceCount = {
+    sharedConcept: 0,
+    chatMemory: 0,
+    diary: 0,
+  };
+
+  for (const item of sorted) {
+    if (selected.length >= limit) {
+      break;
+    }
+    const source = String(item.source || 'sharedConcept');
+    if (sourceCount[source] >= Math.ceil(limit / 2)) {
+      continue;
+    }
+    selected.push(item);
+    sourceCount[source] = (sourceCount[source] || 0) + 1;
+  }
+
+  if (selected.length < limit) {
+    for (const item of sorted) {
+      if (selected.length >= limit) {
+        break;
+      }
+      if (!selected.find((entry) => entry.id === item.id && entry.source === item.source)) {
+        selected.push(item);
+      }
+    }
+  }
+
+  return selected.slice(0, limit);
+}
+
+async function recordRagObservability(openid, payload = {}) {
+  try {
+    await db.collection(RAG_OBSERVABILITY_COLLECTION).add({
+      data: {
+        openid,
+        query: String(payload.query || '').slice(0, 300),
+        rewrittenQuery: String(payload.rewrittenQuery || '').slice(0, 500),
+        expandedTerms: Array.isArray(payload.expandedTerms) ? payload.expandedTerms.slice(0, 20) : [],
+        candidateCount: Number(payload.candidateCount) || 0,
+        selectedCount: Number(payload.selectedCount) || 0,
+        topSources: Array.isArray(payload.topSources) ? payload.topSources.slice(0, 20) : [],
+        avgScore: Number(payload.avgScore) || 0,
+        conflicts: Array.isArray(payload.conflicts) ? payload.conflicts.slice(0, 10) : [],
+        latencyMs: Number(payload.latencyMs) || 0,
+        createdAt: new Date(),
+      },
+    });
+  } catch (error) {
+    // Observability must be best-effort only.
+  }
 }
 
 function normalizeRagLimit(limit) {
@@ -313,7 +549,9 @@ function scoreRagCandidate(queryText = '', queryTokens = [], candidate = {}) {
 }
 
 async function retrieveRagContext(openid, { query, limit } = {}) {
-  const normalizedQuery = normalizeRagQuery(query);
+  const startedAt = Date.now();
+  const queryInfo = rewriteRagQuery(query);
+  const normalizedQuery = queryInfo.rewrittenQuery;
   const normalizedLimit = normalizeRagLimit(limit);
   const syncOpenids = getSyncedDiaryOpenids(openid);
 
@@ -322,7 +560,16 @@ async function retrieveRagContext(openid, { query, limit } = {}) {
       list: [],
       total: 0,
       limit: normalizedLimit,
-      query: normalizedQuery,
+      query: queryInfo.originalQuery,
+      rewrittenQuery: queryInfo.rewrittenQuery,
+      expandedTerms: queryInfo.expandedTerms,
+      conflicts: [],
+      metrics: {
+        candidateCount: 0,
+        selectedCount: 0,
+        avgScore: 0,
+        latencyMs: Date.now() - startedAt,
+      },
       error: null,
     };
   }
@@ -346,7 +593,6 @@ async function retrieveRagContext(openid, { query, limit } = {}) {
         .get(),
     ]);
 
-    const queryTokens = buildRagTokens(normalizedQuery);
     const candidates = [];
 
     (sharedConceptRes.data || []).forEach((item) => {
@@ -412,21 +658,22 @@ async function retrieveRagContext(openid, { query, limit } = {}) {
     });
 
     const ranked = candidates
-      .map((candidate) => ({
-        ...candidate,
-        score: scoreRagCandidate(normalizedQuery, queryTokens, candidate),
-      }))
-      .filter((candidate) => candidate.score > 0)
-      .sort((a, b) => {
-        if (b.score !== a.score) {
-          return b.score - a.score;
-        }
-        return toTimeMs(b.createdAt) - toTimeMs(a.createdAt);
-      });
+      .map((candidate) => {
+        const scoreParts = scoreRagCandidateHybrid(queryInfo, candidate);
+        return {
+          ...candidate,
+          score: scoreParts.totalScore,
+          scoreParts,
+        };
+      })
+      .filter((candidate) => candidate.score > 0);
+
+    const reranked = rerankRagCandidates(ranked, normalizedLimit * 2);
+    const conflicts = detectRagConflicts(reranked);
 
     const deduped = [];
     const seen = new Set();
-    ranked.forEach((item) => {
+    reranked.forEach((item) => {
       if (deduped.length >= normalizedLimit) {
         return;
       }
@@ -441,15 +688,43 @@ async function retrieveRagContext(openid, { query, limit } = {}) {
         userLabel: item.userLabel,
         content: item.content,
         createdAt: item.createdAt,
+        scoreParts: item.scoreParts,
         score: Number(item.score.toFixed(3)),
       });
+    });
+
+    const avgScore = deduped.length
+      ? deduped.reduce((sum, item) => sum + Number(item.score || 0), 0) / deduped.length
+      : 0;
+    const topSources = deduped.map((item) => item.source);
+    const latencyMs = Date.now() - startedAt;
+
+    await recordRagObservability(openid, {
+      query: queryInfo.originalQuery,
+      rewrittenQuery: queryInfo.rewrittenQuery,
+      expandedTerms: queryInfo.expandedTerms,
+      candidateCount: ranked.length,
+      selectedCount: deduped.length,
+      topSources,
+      avgScore,
+      conflicts,
+      latencyMs,
     });
 
     return {
       list: deduped,
       total: deduped.length,
       limit: normalizedLimit,
-      query: normalizedQuery,
+      query: queryInfo.originalQuery,
+      rewrittenQuery: queryInfo.rewrittenQuery,
+      expandedTerms: queryInfo.expandedTerms,
+      conflicts,
+      metrics: {
+        candidateCount: ranked.length,
+        selectedCount: deduped.length,
+        avgScore: Number(avgScore.toFixed(3)),
+        latencyMs,
+      },
       error: null,
     };
   } catch (error) {
@@ -458,10 +733,81 @@ async function retrieveRagContext(openid, { query, limit } = {}) {
       list: [],
       total: 0,
       limit: normalizedLimit,
-      query: normalizedQuery,
+      query: queryInfo.originalQuery,
+      rewrittenQuery: queryInfo.rewrittenQuery,
+      expandedTerms: queryInfo.expandedTerms,
+      conflicts: [],
+      metrics: {
+        candidateCount: 0,
+        selectedCount: 0,
+        avgScore: 0,
+        latencyMs: Date.now() - startedAt,
+      },
       error: error && error.message ? error.message : 'Retrieve RAG context failed',
     };
   }
+}
+
+async function runRagEvaluation(openid, { queries, limit } = {}) {
+  if (!isAdmin(openid)) {
+    return {
+      success: false,
+      error: 'No permission',
+      summary: null,
+      details: [],
+    };
+  }
+
+  const evalQueries = (Array.isArray(queries) && queries.length)
+    ? queries.map((item) => ({
+        query: String(item && item.query ? item.query : '').trim(),
+        expectedKeywords: Array.isArray(item && item.expectedKeywords) ? item.expectedKeywords : [],
+      })).filter((item) => item.query)
+    : RAG_EVAL_QUERIES;
+
+  const details = [];
+  for (const item of evalQueries) {
+    const result = await retrieveRagContext(openid, {
+      query: item.query,
+      limit: limit || DEFAULT_RAG_RESULT_LIMIT,
+    });
+    const topText = (result.list || []).map((row) => String(row.content || '')).join('\n');
+    const hitCount = (item.expectedKeywords || []).filter((keyword) => keyword && topText.includes(keyword)).length;
+    const recall = (item.expectedKeywords || []).length
+      ? hitCount / (item.expectedKeywords || []).length
+      : 0;
+    details.push({
+      query: item.query,
+      expectedKeywords: item.expectedKeywords || [],
+      hitCount,
+      recall: Number(recall.toFixed(3)),
+      selectedCount: Number((result.metrics && result.metrics.selectedCount) || 0),
+      avgScore: Number((result.metrics && result.metrics.avgScore) || 0),
+      latencyMs: Number((result.metrics && result.metrics.latencyMs) || 0),
+      rewrittenQuery: result.rewrittenQuery || item.query,
+      conflicts: result.conflicts || [],
+      topSources: (result.list || []).map((row) => row.source),
+    });
+  }
+
+  const avgRecall = details.length
+    ? details.reduce((sum, row) => sum + Number(row.recall || 0), 0) / details.length
+    : 0;
+  const avgLatency = details.length
+    ? details.reduce((sum, row) => sum + Number(row.latencyMs || 0), 0) / details.length
+    : 0;
+
+  return {
+    success: true,
+    error: null,
+    summary: {
+      totalQueries: details.length,
+      avgRecall: Number(avgRecall.toFixed(3)),
+      avgLatencyMs: Number(avgLatency.toFixed(1)),
+      passedQueries: details.filter((row) => Number(row.recall) >= 0.5).length,
+    },
+    details,
+  };
 }
 
 function getTodayDateText() {
@@ -470,6 +816,15 @@ function getTodayDateText() {
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function formatDateForTemplate(dateText) {
+  const normalized = normalizeCalendarDate(dateText);
+  if (!normalized) {
+    return '';
+  }
+  const [y, m, d] = normalized.split('-');
+  return `${y}年${m}月${d}日`;
 }
 
 function shiftDateText(dateText, dayOffset = 0) {
@@ -748,7 +1103,8 @@ function buildReminderSubscribeMessage(sourceType = '', reminderType = '', sourc
     data[fieldMap.reminderPerson] = { value: sanitizeTemplateText(recipientName, getReminderFieldMaxLen(fieldMap.reminderPerson)) || 'ä½ ' };
   }
   if (fieldMap.date) {
-    data[fieldMap.date] = { value: dateValue || getTodayDateText() };
+    const rawDate = dateValue || getTodayDateText();
+    data[fieldMap.date] = { value: formatDateForTemplate(rawDate) || rawDate };
   }
   if (fieldMap.reminderThing) {
     data[fieldMap.reminderThing] = { value: sanitizeTemplateText(reminderThingValue, getReminderFieldMaxLen(fieldMap.reminderThing)) || 'æé†’äº‹é¡¹' };
@@ -1942,6 +2298,7 @@ async function listSharedConceptMemories(openid, { limit } = {}) {
 
 async function addSharedConceptMemory(openid, { content } = {}) {
   const finalContent = normalizeSharedMemoryContent(content);
+  const contentFingerprint = normalizeMemoryFingerprint(finalContent);
   if (!finalContent) {
     return {
       success: false,
@@ -1961,21 +2318,43 @@ async function addSharedConceptMemory(openid, { content } = {}) {
   }
 
   try {
-    const existingRes = await db.collection(SHARED_CONCEPT_MEMORY_COLLECTION).where({
+    const recentRes = await db.collection(SHARED_CONCEPT_MEMORY_COLLECTION).where({
       ownerOpenid: _.in(openids),
-      content: finalContent,
-    }).limit(1).get();
-    if (existingRes.data && existingRes.data.length) {
+    }).orderBy('createdAt', 'desc').limit(MEMORY_CONFLICT_WINDOW_SIZE).get();
+
+    const existing = (recentRes.data || []).find((item) => {
+      const prev = normalizeMemoryFingerprint(item && item.content ? item.content : '');
+      return !!prev && prev === contentFingerprint;
+    });
+    if (existing) {
       return {
         success: true,
         error: null,
-        item: pickSharedMemoryFields(existingRes.data[0], openid),
+        item: pickSharedMemoryFields(existing, openid),
       };
     }
+
+    const conflictWith = (recentRes.data || []).find((item) => {
+      const prevContent = String(item && item.content ? item.content : '').trim();
+      if (!prevContent) {
+        return false;
+      }
+      const subjectNow = finalContent.match(/^([\u4e00-\u9fffA-Za-z0-9]{1,12})/);
+      const subjectPrev = prevContent.match(/^([\u4e00-\u9fffA-Za-z0-9]{1,12})/);
+      if (!subjectNow || !subjectPrev || subjectNow[1] !== subjectPrev[1]) {
+        return false;
+      }
+      const nowNeg = /(不是|并非|没有|无)/.test(finalContent);
+      const prevNeg = /(不是|并非|没有|无)/.test(prevContent);
+      return nowNeg !== prevNeg;
+    });
 
     const addResult = await db.collection(SHARED_CONCEPT_MEMORY_COLLECTION).add({
       data: {
         content: finalContent,
+        contentFingerprint,
+        conflictTag: conflictWith ? 'possible_conflict' : '',
+        conflictRefId: conflictWith ? String(conflictWith._id || '') : '',
         createdAt: new Date(),
         ownerOpenid: openid,
       },
@@ -2118,6 +2497,13 @@ async function updateSharedBookkeeping(openid, payload = {}) {
       return { success: false, error: 'Invalid promiseAmount', item: null };
     }
     patch.promiseAmount = promiseAmount;
+  }
+  if (payload.repaidAmount !== undefined) {
+    const repaidAmount = normalizeMoney(payload.repaidAmount);
+    if (repaidAmount < 0) {
+      return { success: false, error: 'Invalid repaidAmount', item: null };
+    }
+    patch.repaidAmount = repaidAmount;
   }
   if (payload.transferAmount !== undefined) {
     const transferAmount = normalizeMoney(payload.transferAmount);
@@ -2430,6 +2816,579 @@ async function deleteSectionItem(section, id) {
   }
 }
 
+function pickChecklistFields(doc = {}, viewerOpenid = '') {
+  const ownerOpenid = String(doc.ownerOpenid || doc._openid || '').trim();
+  const identity = getUserIdentity(ownerOpenid);
+  const rawItems = Array.isArray(doc.items) ? doc.items : [];
+  const items = rawItems.map((it) => ({
+    id: String((it && it.id) || ''),
+    content: String((it && it.content) || ''),
+    blocker: String((it && it.blocker) || ''),
+    done: !!(it && it.done),
+    createdAt: (it && it.createdAt) || '',
+  }));
+  const doneCount = items.filter((it) => it.done).length;
+  return {
+    id: String(doc._id || ''),
+    ownerOpenid,
+    ownerLabel: identity.userLabel || '',
+    title: String(doc.title || ''),
+    expectedDate: String(doc.expectedDate || ''),
+    items,
+    itemCount: items.length,
+    doneCount,
+    createdAt: doc.createdAt || '',
+    updatedAt: doc.updatedAt || '',
+    isOwner: ownerOpenid === String(viewerOpenid || ''),
+  };
+}
+
+function generateChecklistItemId() {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function loadChecklistDoc(openid, docId) {
+  const detailRes = await db.collection(SHARED_CHECKLIST_COLLECTION).doc(docId).get();
+  const doc = detailRes.data || null;
+  if (!doc) {
+    return { doc: null, error: 'Checklist not found' };
+  }
+  const ownerOpenid = String(doc.ownerOpenid || doc._openid || '').trim();
+  const allowedOpenids = getSyncedDiaryOpenids(openid);
+  if (!allowedOpenids.includes(ownerOpenid)) {
+    return { doc: null, error: 'No permission' };
+  }
+  return { doc, error: null };
+}
+
+async function listSharedChecklists(openid, { limit } = {}) {
+  const normalizedLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
+  const openids = getSyncedDiaryOpenids(openid);
+  if (!openids.length) {
+    return { list: [], total: 0, error: null };
+  }
+  try {
+    const res = await db.collection(SHARED_CHECKLIST_COLLECTION)
+      .where({ ownerOpenid: _.in(openids) })
+      .orderBy('updatedAt', 'desc')
+      .limit(normalizedLimit)
+      .get();
+    const list = (res.data || []).map((d) => pickChecklistFields(d, openid));
+    return { list, total: list.length, error: null };
+  } catch (error) {
+    return {
+      list: [],
+      total: 0,
+      error: (error && error.message) || 'List checklists failed',
+    };
+  }
+}
+
+async function addSharedChecklist(openid, { title, expectedDate } = {}) {
+  const finalTitle = String(title || '').trim().slice(0, 60);
+  const normalizedDate = normalizeCalendarDate(expectedDate) || '';
+  if (!finalTitle) {
+    return { success: false, error: 'Title is required', item: null };
+  }
+  try {
+    const now = new Date();
+    const addResult = await db.collection(SHARED_CHECKLIST_COLLECTION).add({
+      data: {
+        ownerOpenid: openid,
+        title: finalTitle,
+        expectedDate: normalizedDate,
+        items: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    const detailRes = await db.collection(SHARED_CHECKLIST_COLLECTION).doc(addResult._id).get();
+    return {
+      success: true,
+      error: null,
+      item: pickChecklistFields(detailRes.data || {}, openid),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: (error && error.message) || 'Add checklist failed',
+      item: null,
+    };
+  }
+}
+
+async function updateSharedChecklist(openid, { id, title, expectedDate } = {}) {
+  const docId = String(id || '').trim();
+  if (!docId) {
+    return { success: false, error: 'id is required', item: null };
+  }
+  try {
+    const loaded = await loadChecklistDoc(openid, docId);
+    if (!loaded.doc) {
+      return { success: false, error: loaded.error, item: null };
+    }
+    const patch = { updatedAt: new Date() };
+    if (title !== undefined) {
+      const finalTitle = String(title || '').trim().slice(0, 60);
+      if (!finalTitle) {
+        return { success: false, error: 'Title cannot be empty', item: null };
+      }
+      patch.title = finalTitle;
+    }
+    if (expectedDate !== undefined) {
+      patch.expectedDate = normalizeCalendarDate(expectedDate) || '';
+    }
+    await db.collection(SHARED_CHECKLIST_COLLECTION).doc(docId).update({ data: patch });
+    const updatedRes = await db.collection(SHARED_CHECKLIST_COLLECTION).doc(docId).get();
+    return {
+      success: true,
+      error: null,
+      item: pickChecklistFields(updatedRes.data || {}, openid),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: (error && error.message) || 'Update checklist failed',
+      item: null,
+    };
+  }
+}
+
+async function deleteSharedChecklist(openid, { id } = {}) {
+  const docId = String(id || '').trim();
+  if (!docId) {
+    return { success: false, error: 'id is required' };
+  }
+  try {
+    const loaded = await loadChecklistDoc(openid, docId);
+    if (!loaded.doc) {
+      return { success: false, error: loaded.error };
+    }
+    const ownerOpenid = String(loaded.doc.ownerOpenid || loaded.doc._openid || '').trim();
+    if (ownerOpenid !== String(openid)) {
+      return { success: false, error: 'Only owner can delete' };
+    }
+    await db.collection(SHARED_CHECKLIST_COLLECTION).doc(docId).remove();
+    return { success: true, error: null };
+  } catch (error) {
+    return {
+      success: false,
+      error: (error && error.message) || 'Delete checklist failed',
+    };
+  }
+}
+
+async function addChecklistItem(openid, { id, content, blocker } = {}) {
+  const docId = String(id || '').trim();
+  const finalContent = String(content || '').trim().slice(0, 100);
+  const finalBlocker = String(blocker || '').trim().slice(0, 100);
+  if (!docId || !finalContent) {
+    return { success: false, error: 'id and content are required', item: null };
+  }
+  try {
+    const loaded = await loadChecklistDoc(openid, docId);
+    if (!loaded.doc) {
+      return { success: false, error: loaded.error, item: null };
+    }
+    const currentItems = Array.isArray(loaded.doc.items) ? loaded.doc.items : [];
+    const nextItems = currentItems.concat([{
+      id: generateChecklistItemId(),
+      content: finalContent,
+      blocker: finalBlocker,
+      done: false,
+      createdAt: new Date().toISOString(),
+    }]);
+    await db.collection(SHARED_CHECKLIST_COLLECTION).doc(docId).update({
+      data: { items: nextItems, updatedAt: new Date() },
+    });
+    const updatedRes = await db.collection(SHARED_CHECKLIST_COLLECTION).doc(docId).get();
+    return {
+      success: true,
+      error: null,
+      item: pickChecklistFields(updatedRes.data || {}, openid),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: (error && error.message) || 'Add checklist item failed',
+      item: null,
+    };
+  }
+}
+
+async function updateChecklistItem(openid, { id, itemId, content, blocker, done } = {}) {
+  const docId = String(id || '').trim();
+  const targetItemId = String(itemId || '').trim();
+  if (!docId || !targetItemId) {
+    return { success: false, error: 'id and itemId are required', item: null };
+  }
+  try {
+    const loaded = await loadChecklistDoc(openid, docId);
+    if (!loaded.doc) {
+      return { success: false, error: loaded.error, item: null };
+    }
+    const currentItems = Array.isArray(loaded.doc.items) ? loaded.doc.items : [];
+    let found = false;
+    const nextItems = currentItems.map((it) => {
+      if (!it || it.id !== targetItemId) {
+        return it;
+      }
+      found = true;
+      const next = Object.assign({}, it);
+      if (content !== undefined) {
+        next.content = String(content || '').trim().slice(0, 100);
+      }
+      if (blocker !== undefined) {
+        next.blocker = String(blocker || '').trim().slice(0, 100);
+      }
+      if (done !== undefined) {
+        next.done = !!done;
+      }
+      return next;
+    });
+    if (!found) {
+      return { success: false, error: 'Item not found', item: null };
+    }
+    await db.collection(SHARED_CHECKLIST_COLLECTION).doc(docId).update({
+      data: { items: nextItems, updatedAt: new Date() },
+    });
+    const updatedRes = await db.collection(SHARED_CHECKLIST_COLLECTION).doc(docId).get();
+    return {
+      success: true,
+      error: null,
+      item: pickChecklistFields(updatedRes.data || {}, openid),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: (error && error.message) || 'Update checklist item failed',
+      item: null,
+    };
+  }
+}
+
+async function deleteChecklistItem(openid, { id, itemId } = {}) {
+  const docId = String(id || '').trim();
+  const targetItemId = String(itemId || '').trim();
+  if (!docId || !targetItemId) {
+    return { success: false, error: 'id and itemId are required', item: null };
+  }
+  try {
+    const loaded = await loadChecklistDoc(openid, docId);
+    if (!loaded.doc) {
+      return { success: false, error: loaded.error, item: null };
+    }
+    const currentItems = Array.isArray(loaded.doc.items) ? loaded.doc.items : [];
+    const nextItems = currentItems.filter((it) => it && it.id !== targetItemId);
+    if (nextItems.length === currentItems.length) {
+      return { success: false, error: 'Item not found', item: null };
+    }
+    await db.collection(SHARED_CHECKLIST_COLLECTION).doc(docId).update({
+      data: { items: nextItems, updatedAt: new Date() },
+    });
+    const updatedRes = await db.collection(SHARED_CHECKLIST_COLLECTION).doc(docId).get();
+    return {
+      success: true,
+      error: null,
+      item: pickChecklistFields(updatedRes.data || {}, openid),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: (error && error.message) || 'Delete checklist item failed',
+      item: null,
+    };
+  }
+}
+
+// ==================== Recipe AI generation ====================
+
+function httpsPostJson(url, headers, body) {
+  return new Promise((resolve, reject) => {
+    try {
+      const https = require('https');
+      const parsed = new URL(url);
+      const payload = Buffer.from(JSON.stringify(body || {}), 'utf8');
+      const req = https.request(
+        {
+          method: 'POST',
+          protocol: parsed.protocol,
+          hostname: parsed.hostname,
+          port: parsed.port || 443,
+          path: `${parsed.pathname}${parsed.search || ''}`,
+          headers: Object.assign(
+            {
+              'Content-Type': 'application/json',
+              'Content-Length': payload.length,
+            },
+            headers || {}
+          ),
+          timeout: 60000,
+        },
+        (res) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () => {
+            const text = Buffer.concat(chunks).toString('utf8');
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              try {
+                resolve(JSON.parse(text));
+              } catch (e) {
+                resolve({ raw: text });
+              }
+            } else {
+              reject(new Error(`HTTP ${res.statusCode}: ${text.slice(0, 300)}`));
+            }
+          });
+        }
+      );
+      req.on('error', (err) => reject(err));
+      req.on('timeout', () => {
+        req.destroy(new Error('Request timeout'));
+      });
+      req.write(payload);
+      req.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+async function callAzureOpenAIChat(messages, options = {}) {
+  const { endpointBase, apiKey, deployment, apiVersion } = AZURE_OPENAI_CONFIG;
+  if (!endpointBase || !apiKey || !deployment) {
+    throw new Error('Azure OpenAI is not configured');
+  }
+  const url = `${endpointBase}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+  const body = {
+    messages,
+    temperature: typeof options.temperature === 'number' ? options.temperature : 0.4,
+    max_tokens: options.maxTokens || 1200,
+  };
+  if (options.responseFormat) {
+    body.response_format = options.responseFormat;
+  }
+  const result = await httpsPostJson(url, { 'api-key': apiKey }, body);
+  const content = (((result || {}).choices || [])[0] || {}).message || {};
+  const text = String(content.content || '').trim();
+  if (!text) {
+    throw new Error('AI returned empty content');
+  }
+  return text;
+}
+
+async function downloadCloudFileAsDataUrl(fileID) {
+  if (!fileID) {
+    return '';
+  }
+  try {
+    const res = await cloud.downloadFile({ fileID });
+    const buf = res && res.fileContent;
+    if (!buf) {
+      return '';
+    }
+    const lower = String(fileID).toLowerCase();
+    let mime = 'image/jpeg';
+    if (lower.endsWith('.png')) mime = 'image/png';
+    else if (lower.endsWith('.webp')) mime = 'image/webp';
+    else if (lower.endsWith('.gif')) mime = 'image/gif';
+    const base64 = Buffer.from(buf).toString('base64');
+    return `data:${mime};base64,${base64}`;
+  } catch (error) {
+    console.error('downloadCloudFileAsDataUrl error:', error.message);
+    return '';
+  }
+}
+
+function normalizeRecipeKeyText(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[\s\-_/]/g, '')
+    .replace(/[，,。.！!？?、；;：:（）()\[\]【】""''""''`~!@#$%^&*+=]/g, '')
+    .trim();
+}
+
+function normalizeIngredientToken(text) {
+  return normalizeRecipeKeyText(
+    String(text || '')
+      .replace(/[\d\s]+(?:克|g|千克|kg|毫升|ml|升|l|勺|汤匙|茶匙|大勺|小勺|个|只|片|段|根|颗|粒|撮|把|瓣|斤|两|份|点|少许|适量)/g, '')
+      .replace(/\d+/g, '')
+  );
+}
+
+function stringBigramSet(text) {
+  const s = normalizeRecipeKeyText(text);
+  const set = new Set();
+  if (s.length <= 1) {
+    if (s) set.add(s);
+    return set;
+  }
+  for (let i = 0; i < s.length - 1; i += 1) {
+    set.add(s.slice(i, i + 2));
+  }
+  return set;
+}
+
+function jaccardSets(setA, setB) {
+  if (!setA.size || !setB.size) return 0;
+  let inter = 0;
+  setA.forEach((v) => {
+    if (setB.has(v)) inter += 1;
+  });
+  const union = setA.size + setB.size - inter;
+  return union > 0 ? inter / union : 0;
+}
+
+function computeRecipeSimilarity(candidate = {}, target = {}) {
+  const nameA = normalizeRecipeKeyText(candidate.name);
+  const nameB = normalizeRecipeKeyText(target.name);
+  let nameScore = 0;
+  if (nameA && nameB) {
+    if (nameA === nameB) {
+      nameScore = 1;
+    } else if (nameA.includes(nameB) || nameB.includes(nameA)) {
+      nameScore = 0.85;
+    } else {
+      nameScore = jaccardSets(stringBigramSet(nameA), stringBigramSet(nameB));
+    }
+  }
+
+  const ingA = new Set(
+    (candidate.ingredients || []).map(normalizeIngredientToken).filter(Boolean)
+  );
+  const ingB = new Set(
+    (target.ingredients || []).map(normalizeIngredientToken).filter(Boolean)
+  );
+  const ingredientScore = jaccardSets(ingA, ingB);
+
+  return Number((nameScore * 0.6 + ingredientScore * 0.4).toFixed(3));
+}
+
+async function findSimilarRecipe(openid, target = {}) {
+  const openids = getSyncedDiaryOpenids(openid);
+  if (!openids.length) return null;
+  try {
+    const res = await db
+      .collection(SHARED_RECIPE_COLLECTION)
+      .where({ ownerOpenid: _.in(openids) })
+      .limit(100)
+      .get();
+    let best = null;
+    (res.data || []).forEach((doc) => {
+      const score = computeRecipeSimilarity(doc, target);
+      if (!best || score > best.score) {
+        best = { doc, score };
+      }
+    });
+    if (!best || best.score < RECIPE_SIMILARITY_THRESHOLD) {
+      return null;
+    }
+    return {
+      score: best.score,
+      item: pickRecipeFields(best.doc, openid),
+    };
+  } catch (error) {
+    console.error('findSimilarRecipe error:', error.message);
+    return null;
+  }
+}
+
+function extractRecipeJsonBlock(text) {
+  if (!text) return null;
+  const raw = String(text).trim();
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : raw;
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) return null;
+  try {
+    return JSON.parse(candidate.slice(start, end + 1));
+  } catch (e) {
+    return null;
+  }
+}
+
+async function generateRecipeFromInput(openid, { description, imageFileID } = {}) {
+  const desc = String(description || '').trim().slice(0, 800);
+  const fileID = String(imageFileID || '').trim();
+  if (!desc && !fileID) {
+    return { success: false, error: '请提供图片或描述', data: null };
+  }
+
+  const systemPrompt = `你是一位中文家庭菜谱生成助手。基于用户给出的菜品图片和/或文字描述，生成一份可直接照做的菜谱。请严格只输出 JSON，禁止输出其它解释文字。JSON 结构：
+{
+  "name": "菜名（10字以内）",
+  "ingredients": ["食材1 用量", "食材2 用量"],
+  "steps": ["步骤1...", "步骤2..."],
+  "note": "可选小贴士（少于60字）"
+}
+- ingredients 每项尽量含份量，列 3~10 项；
+- steps 每项一句话，6~12 步；
+- 若图片与描述冲突，以图片内容为主；
+- 若信息不足，用常见家常做法合理补全。`;
+
+  const userContent = [];
+  if (desc) {
+    userContent.push({ type: 'text', text: `描述：${desc}` });
+  } else {
+    userContent.push({ type: 'text', text: '请根据图片识别菜品并生成菜谱。' });
+  }
+  if (fileID) {
+    const dataUrl = await downloadCloudFileAsDataUrl(fileID);
+    if (dataUrl) {
+      userContent.push({ type: 'image_url', image_url: { url: dataUrl } });
+    }
+  }
+
+  let rawText = '';
+  try {
+    rawText = await callAzureOpenAIChat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+      { temperature: 0.5, maxTokens: 1400, responseFormat: { type: 'json_object' } }
+    );
+  } catch (error) {
+    return {
+      success: false,
+      error: (error && error.message) || 'AI 调用失败',
+      data: null,
+    };
+  }
+
+  const parsed = extractRecipeJsonBlock(rawText) || {};
+  const generated = {
+    name: String(parsed.name || '').trim().slice(0, 40),
+    ingredients: Array.isArray(parsed.ingredients)
+      ? parsed.ingredients.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 30)
+      : [],
+    steps: Array.isArray(parsed.steps)
+      ? parsed.steps.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 30)
+      : [],
+    note: String(parsed.note || '').trim().slice(0, 200),
+  };
+
+  if (!generated.name || !generated.ingredients.length || !generated.steps.length) {
+    return {
+      success: false,
+      error: 'AI 返回内容不完整，请重试或补充描述',
+      data: { rawText, generated },
+    };
+  }
+
+  const similar = await findSimilarRecipe(openid, generated);
+  return {
+    success: true,
+    error: null,
+    data: {
+      mode: similar ? 'matched' : 'generated',
+      generated,
+      similar: similar || null,
+    },
+  };
+}
+
 exports.main = async (event = {}, context) => {
   const wxContext = cloud.getWXContext();
   const openid = wxContext.OPENID;
@@ -2668,6 +3627,25 @@ exports.main = async (event = {}, context) => {
       ragCount: result.total,
       ragLimit: result.limit,
       query: result.query,
+      rewrittenQuery: result.rewrittenQuery,
+      expandedTerms: result.expandedTerms,
+      conflicts: result.conflicts,
+      metrics: result.metrics,
+      error: result.error,
+    };
+  }
+
+  if (action === 'runRagEvaluation' || action === 'runRagEvalation') {
+    const result = await runRagEvaluation(openid, {
+      queries: event.queries,
+      limit: event.limit,
+    });
+    return {
+      isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
+      envId,
+      success: result.success,
+      summary: result.summary,
+      details: result.details,
       error: result.error,
     };
   }
@@ -2732,6 +3710,7 @@ exports.main = async (event = {}, context) => {
       id: event.id,
       promiseDate: event.promiseDate,
       promiseAmount: event.promiseAmount,
+      repaidAmount: event.repaidAmount,
       transferAmount: event.transferAmount,
       purchaseItem: event.purchaseItem,
     });
@@ -2914,6 +3893,116 @@ exports.main = async (event = {}, context) => {
       isAdmin: true,
       envId,
       success: result.success,
+      error: result.error,
+    };
+  }
+
+  if (action === 'listSharedChecklists') {
+    const result = await listSharedChecklists(openid, { limit: event.limit });
+    return {
+      isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
+      envId,
+      checklistList: result.list,
+      checklistCount: result.total,
+      error: result.error,
+    };
+  }
+
+  if (action === 'addSharedChecklist') {
+    const result = await addSharedChecklist(openid, {
+      title: event.title,
+      expectedDate: event.expectedDate,
+    });
+    return {
+      isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
+      envId,
+      success: result.success,
+      item: result.item,
+      error: result.error,
+    };
+  }
+
+  if (action === 'updateSharedChecklist') {
+    const result = await updateSharedChecklist(openid, {
+      id: event.id,
+      title: event.title,
+      expectedDate: event.expectedDate,
+    });
+    return {
+      isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
+      envId,
+      success: result.success,
+      item: result.item,
+      error: result.error,
+    };
+  }
+
+  if (action === 'deleteSharedChecklist') {
+    const result = await deleteSharedChecklist(openid, { id: event.id });
+    return {
+      isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
+      envId,
+      success: result.success,
+      error: result.error,
+    };
+  }
+
+  if (action === 'addChecklistItem') {
+    const result = await addChecklistItem(openid, {
+      id: event.id,
+      content: event.content,
+      blocker: event.blocker,
+    });
+    return {
+      isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
+      envId,
+      success: result.success,
+      item: result.item,
+      error: result.error,
+    };
+  }
+
+  if (action === 'updateChecklistItem') {
+    const result = await updateChecklistItem(openid, {
+      id: event.id,
+      itemId: event.itemId,
+      content: event.content,
+      blocker: event.blocker,
+      done: event.done,
+    });
+    return {
+      isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
+      envId,
+      success: result.success,
+      item: result.item,
+      error: result.error,
+    };
+  }
+
+  if (action === 'deleteChecklistItem') {
+    const result = await deleteChecklistItem(openid, {
+      id: event.id,
+      itemId: event.itemId,
+    });
+    return {
+      isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
+      envId,
+      success: result.success,
+      item: result.item,
+      error: result.error,
+    };
+  }
+
+  if (action === 'generateRecipeFromInput') {
+    const result = await generateRecipeFromInput(openid, {
+      description: event.description,
+      imageFileID: event.imageFileID,
+    });
+    return {
+      isKnownUser: !!USER_IDENTITY_MAP[String(openid || '')],
+      envId,
+      success: result.success,
+      data: result.data,
       error: result.error,
     };
   }

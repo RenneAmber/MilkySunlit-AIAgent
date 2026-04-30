@@ -117,14 +117,18 @@ Page({
     }
     this.generateScene();
     this.generateCalendarDays();
-    await this.loadReminderConfig();
-    await this.refreshReminderSubscriptionState();
-    await this.initSharedCalendar();
+    await Promise.all([
+      this.loadReminderConfig(),
+      this.refreshReminderSubscriptionState(),
+      this.initSharedCalendar(),
+    ]);
   },
 
   async onShow() {
-    await this.refreshReminderSubscriptionState();
-    await this.loadAllMonthData();
+    await Promise.all([
+      this.refreshReminderSubscriptionState(),
+      this.loadAllMonthData(),
+    ]);
   },
 
   toSubscribedMap(subscriptions = []) {

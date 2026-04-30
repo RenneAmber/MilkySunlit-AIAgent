@@ -72,12 +72,13 @@
 
 .btn-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 14rpx;
   margin-top: 18rpx;
 }
 
 .btn {
-  margin-top: 20rpx;
+  margin-top: 8rpx;
   min-width: 170rpx;
   padding: 0 24rpx;
   line-height: 62rpx;
@@ -265,4 +266,39 @@
   color: #dce5ff;
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(194, 208, 255, 0.22);
+}
+
+.rag-summary {
+  margin-top: 14rpx;
+  border-radius: 16rpx;
+  padding: 14rpx 16rpx;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(190, 205, 255, 0.24);
+}
+
+.rag-line {
+  font-size: 22rpx;
+  color: rgba(232, 238, 255, 0.94);
+  line-height: 1.6;
+}
+
+.rag-card {
+  margin-top: 14rpx;
+  border-radius: 16rpx;
+  padding: 16rpx;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.rag-q {
+  font-size: 25rpx;
+  font-weight: 600;
+  color: #1d2b63;
+}
+
+.rag-meta {
+  margin-top: 8rpx;
+  font-size: 21rpx;
+  color: #5d6999;
+  line-height: 1.5;
+  word-break: break-all;
 }
