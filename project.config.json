@@ -1,5 +1,5 @@
 {
-  "miniprogramRoot": "miniprogram/",
+  "miniprogramRoot": "/",
   "cloudfunctionRoot": "cloudfunctions/",
   "setting": {
     "urlCheck": true,
@@ -46,7 +46,7 @@
   "cloudfunctionTemplateRoot": "cloudfunctionTemplate/",
   "condition": {},
   "compileType": "miniprogram",
-  "srcMiniprogramRoot": "miniprogram/",
+  "srcMiniprogramRoot": "/",
   "editorSetting": {
     "tabIndent": "insertSpaces",
     "tabSize": 2
@@ -55,7 +55,7 @@
     "ignore": [],
     "include": []
   },
-  "appid": "wx8ebd38b591686c6f",
+  "appid": "wxdbaac0c736151932",
   "libVersion": "3.9.2",
   "simulatorPluginLibVersion": {}
 }

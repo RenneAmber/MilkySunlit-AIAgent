@@ -1664,6 +1664,7 @@ async function dispatchReminderNotifications() {
   };
 }
 
+
 function pickSharedMemoryFields(item = {}, viewerOpenid = '') {
   const ownerOpenid = item.ownerOpenid || item._openid || '';
   const identity = getUserIdentity(ownerOpenid);
@@ -3395,7 +3396,29 @@ exports.main = async (event = {}, context) => {
   const envId = wxContext.ENV || cloud.DYNAMIC_CURRENT_ENV || '';
   const action = event.action || 'check';
 
-  if ((event.triggerTime || event.triggerName || event.time) && (action === 'check' || action === 'dispatchReminderNotifications')) {
+  // Detect timer trigger: no openid OR explicit trigger fields
+  const isTriggerEvent = !openid || !!(event.triggerTime || event.triggerName || event.time || context.triggerName || context.triggerTime);
+  
+  // For timer triggers, always dispatch reminders
+  if (isTriggerEvent && !openid) {
+    const result = await dispatchReminderNotifications();
+    return {
+      success: true,
+      envId,
+      isTriggerCall: true,
+      hasOpenid: !!openid,
+      triggerDetected: {
+        eventTriggerName: event.triggerName || null,
+        eventTriggerTime: event.triggerTime || null,
+        eventTime: event.time || null,
+        contextTriggerName: context?.triggerName || null,
+        contextTriggerTime: context?.triggerTime || null,
+      },
+      ...result,
+    };
+  }
+
+  if ((event.triggerTime || event.triggerName || event.time || context.triggerName || context.triggerTime) && (action === 'check' || action === 'dispatchReminderNotifications')) {
     const result = await dispatchReminderNotifications();
     return {
       envId,

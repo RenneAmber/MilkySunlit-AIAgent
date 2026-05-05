@@ -6,9 +6,9 @@
   },
   "triggers": [
     {
-      "name": "dailyReminder",
+      "name": "dailyReminderCheck",
       "type": "timer",
-      "config": "0 * * * * * *"
+      "config": "0 0 8 * * *"
     }
   ]
 }
